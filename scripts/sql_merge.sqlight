@@ -1,0 +1,179 @@
+.print 'Cleanup'
+
+.mode list
+
+.print 'Cleaning calendar_dates (based on new data)'
+select count(*) from calendar_dates;
+delete from calendar_dates
+where service_id in (
+    select calendar_dates.service_id
+    from
+        calendar_dates left join
+        calendar_dates_ on
+            calendar_dates.date = calendar_dates_.date and
+            calendar_dates.service_id != calendar_dates_.service_id
+    where calendar_dates_.service_id is not null
+);
+select count(*) from calendar_dates;
+
+.print 'Cleaning calendar_dates (keep last days only) [TODO]'
+
+.print 'Cleaning trips'
+select count(*) from trips;
+delete from trips
+where trip_id in (
+    select trips.trip_id
+    from
+        trips left join
+        calendar_dates on trips.service_id = calendar_dates.service_id
+    where calendar_dates.service_id is null
+);
+select count(*) from trips;
+
+.print 'Cleaning routes'
+select count(*) from routes;
+delete from routes
+where route_id in (
+    select distinct routes.route_id
+    from
+        routes left join
+        trips on routes.route_id = trips.route_id
+    where trips.route_id is null
+);
+select count(*) from routes;
+
+.print 'Cleaning stop_times'
+select count(*) from stop_times;
+delete from stop_times
+where stop_id in (
+    select distinct stop_times.stop_id
+    from
+        stop_times left join
+        trips on stop_times.trip_id = trips.trip_id
+    where trips.trip_id is null
+);
+select count(*) from stop_times;
+
+.print 'Cleaning stops'
+select count(*) from stops;
+delete from stops
+where stop_id in (
+    select stops.stop_id
+    from
+        stops left join
+        stop_times on stops.stop_id = stop_times.stop_id
+    where stop_times.stop_id is null
+);
+select count(*) from stops;
+
+.print 'Upserting'
+
+.print 'Upserting: calendar_dates'
+select count(*) from calendar_dates;
+replace into calendar_dates (
+    service_id,
+    date,
+    exception_type
+) select
+    cast(service_id as integer),
+    date,
+    cast(exception_type as integer)
+from calendar_dates_;
+drop table calendar_dates_;
+select count(*) from calendar_dates;
+
+.print 'Upserting: routes'
+select count(*) from routes;
+replace into routes (
+    route_id,
+    agency_id,
+    route_short_name,
+    route_long_name,
+    route_desc,
+    route_type,
+    route_color,
+    route_text_color
+) select
+    cast(route_id as integer),
+    cast(agency_id as integer),
+    route_short_name,
+    route_long_name,
+    route_desc,
+    cast(route_type as integer),
+    route_color,
+    route_text_color
+from routes_;
+drop table routes_;
+select count(*) from routes;
+
+.print 'Upserting: stop_times'
+select count(*) from stop_times;
+replace into stop_times (
+    trip_id,
+    arrival_time,
+    departure_time,
+    stop_id,
+    stop_sequence,
+    pickup_type,
+    drop_off_type
+) select
+    cast(trip_id as integer),
+    arrival_time,
+    departure_time,
+    cast(stop_id as integer),
+    cast(stop_sequence as integer),
+    cast(pickup_type as integer),
+    cast(drop_off_type as integer)
+from stop_times_;
+drop table stop_times_;
+select count(*) from stop_times;
+
+.print 'Upserting: stops'
+select count(*) from stops;
+replace into stops (
+    stop_id,
+    stop_code,
+    stop_name,
+    stop_desc,
+    stop_lat,
+    stop_lon,
+    zone_id
+) select
+    cast(stop_id as integer),
+    cast(stop_code as integer),
+    stop_name,
+    stop_desc,
+    cast(stop_lat as real),
+    cast(stop_lon as real),
+    cast(zone_id as integer)
+from stops_;
+drop table stops_;
+select count(*) from stops;
+
+.print 'Upserting: trips'
+select count(*) from trips;
+replace into trips (
+    route_id,
+    service_id,
+    trip_id,
+    trip_headsign,
+    shape_id,
+    direction_id
+) select
+    cast(route_id as integer),
+    cast(service_id as integer),
+    cast(trip_id as integer),
+    trip_headsign,
+    cast(shape_id as integer),
+    cast(direction_id as integer)
+from trips_;
+drop table trips_;
+select count(*) from trips;
+
+.print 'Vacuum/analyze'
+vacuum;
+analyze;
+
+.print 'Done.'
+
+-- vi: set expandtab ts=4 sw=4 ft=sql:

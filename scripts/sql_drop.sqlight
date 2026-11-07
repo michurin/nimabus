@@ -1,0 +1,10 @@
+drop table if exists calendar_dates;
+drop table if exists routes;
+drop table if exists stop_times;
+drop table if exists stops;
+drop table if exists trips;
+
+.print 'Tables left:'
+.tables
+
+-- vi: set expandtab ts=4 sw=4 ft=sql:

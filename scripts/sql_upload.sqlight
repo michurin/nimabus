@@ -1,0 +1,17 @@
+.mode csv
+
+.print "Tables:"
+.tables
+
+.print "Loading..."
+.import calendar_dates.txt calendar_dates_
+.import routes.txt routes_
+.import stops.txt stops_
+.import stop_times.txt stop_times_
+.import trips.txt trips_
+.print "Fin."
+
+.print "Tables:"
+.tables
+
+-- vi: set expandtab ts=4 sw=4 ft=sql:

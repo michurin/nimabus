@@ -1,0 +1,56 @@
+.print 'Createing: calendar_dates'
+create table calendar_dates (
+    service_id integer,
+    date text,
+    exception_type integer,
+    updated_at text default current_timestamp,
+    primary key (service_id, date)
+);
+.print 'Createing: routes'
+create table routes (
+    route_id integer primary key,
+    agency_id integer,
+    route_short_name text,
+    route_long_name text,
+    route_desc text,
+    route_type integer,
+    route_color text,
+    route_text_color text,
+    updated_at text default current_timestamp
+);
+.print 'Createing: stop_times'
+create table stop_times (
+    trip_id integer,
+    arrival_time text,
+    departure_time text,
+    stop_id integer,
+    stop_sequence integer,
+    pickup_type integer,
+    drop_off_type integer,
+    updated_at text default current_timestamp,
+    primary key (trip_id, stop_sequence)
+);
+.print 'Createing: stops'
+create table stops (
+    stop_id   integer primary key,
+    stop_code integer,
+    stop_name text,
+    stop_desc text,
+    stop_lat  real,
+    stop_lon  real,
+    zone_id   integer,
+    updated_at text default current_timestamp
+);
+.print 'Createing: trips'
+create table trips (
+    route_id integer,
+    service_id integer,
+    trip_id integer primary key,
+    trip_headsign text,
+    shape_id integer,
+    direction_id integer,
+    updated_at text default current_timestamp
+);
+.print 'Done.'
+
+-- vi: set expandtab ts=4 sw=4 ft=sql:
