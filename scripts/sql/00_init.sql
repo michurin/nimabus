@@ -1,3 +1,8 @@
+.print 'Createing: system_generations'
+create table system_generations (
+    generation_id integer primary key autoincrement,
+    created_at text default current_timestamp
+);
 .print 'Createing: agency'
 create table agency (
     agency_id integer primary key,
@@ -5,14 +10,15 @@ create table agency (
     agency_url text,
     agency_timezone text,
     agency_lang text,
-    agency_phone text
+    agency_phone text,
+    generation_id integer
 );
 .print 'Createing: calendar_dates'
 create table calendar_dates (
     service_id integer,
     date text,
     exception_type integer,
-    updated_at text default current_timestamp,
+    generation_id integer,
     primary key (service_id, date)
 );
 .print 'Createing: routes'
@@ -25,7 +31,7 @@ create table routes (
     route_type integer,
     route_color text,
     route_text_color text,
-    updated_at text default current_timestamp
+    generation_id integer
 );
 .print 'Createing: stop_times'
 create table stop_times (
@@ -36,7 +42,7 @@ create table stop_times (
     stop_sequence integer,
     pickup_type integer,
     drop_off_type integer,
-    updated_at text default current_timestamp,
+    generation_id integer,
     primary key (trip_id, stop_sequence)
 );
 .print 'Createing: stops'
@@ -48,7 +54,7 @@ create table stops (
     stop_lat  real,
     stop_lon  real,
     zone_id   integer,
-    updated_at text default current_timestamp
+    generation_id integer
 );
 .print 'Createing: trips'
 create table trips (
@@ -58,7 +64,7 @@ create table trips (
     trip_headsign text,
     shape_id integer,
     direction_id integer,
-    updated_at text default current_timestamp
+    generation_id integer
 );
 .print 'Createing: translations'
 create table translations (
@@ -67,6 +73,7 @@ create table translations (
     language text,
     translation text,
     record_id integre,
+    generation_id integer,
     primary key (
         table_name,
         field_name,

@@ -1,3 +1,4 @@
+drop table if exists system_generations;
 drop table if exists agency;
 drop table if exists calendar_dates;
 drop table if exists routes;
