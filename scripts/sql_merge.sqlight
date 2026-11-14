@@ -1,6 +1,12 @@
-.print 'Cleanup'
-
+.bail on
+.echo on
+.changes on
+.timeout 5000
 .mode list
+
+begin immediate;
+
+.print 'Cleanup'
 
 .print 'Cleaning calendar_dates (based on new data)'
 select count(*) from calendar_dates;
@@ -67,6 +73,26 @@ where stop_id in (
 select count(*) from stops;
 
 .print 'Upserting'
+
+.print 'Upserting: agency'
+select count(*) from agency;
+replace into agency (
+    agency_id,
+    agency_name,
+    agency_url,
+    agency_timezone,
+    agency_lang,
+    agency_phone
+) select
+    cast(agency_id as integer),
+    agency_name,
+    agency_url,
+    agency_timezone,
+    agency_lang,
+    agency_phone
+from agency_;
+drop table agency_;
+select count(*) from agency;
 
 .print 'Upserting: calendar_dates'
 select count(*) from calendar_dates;
@@ -170,9 +196,29 @@ from trips_;
 drop table trips_;
 select count(*) from trips;
 
+.print 'Upserting: translations'
+select count(*) from translations;
+replace into translations (
+    table_name,
+    field_name,
+    language,
+    translation,
+    record_id
+) select
+    table_name,
+    field_name,
+    language,
+    translation,
+    cast(record_id as integer)
+from translations_;
+drop table translations_;
+select count(*) from translations;
+
+commit;
+
 .print 'Vacuum/analyze'
-vacuum;
 analyze;
+vacuum;
 
 .print 'Done.'
 

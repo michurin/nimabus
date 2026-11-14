@@ -1,3 +1,12 @@
+.print 'Createing: agency'
+create table agency (
+    agency_id integer primary key,
+    agency_name text,
+    agency_url text,
+    agency_timezone text,
+    agency_lang text,
+    agency_phone text
+);
 .print 'Createing: calendar_dates'
 create table calendar_dates (
     service_id integer,
@@ -50,6 +59,22 @@ create table trips (
     shape_id integer,
     direction_id integer,
     updated_at text default current_timestamp
+);
+.print 'Createing: translations'
+create table translations (
+    table_name text,
+    field_name text,
+    language text,
+    translation text,
+    record_id integre,
+    primary key (
+        table_name,
+        field_name,
+        language,
+        record_id
+        -- record_sub_id -- according spec they have to be
+        -- field_value
+    )
 );
 .print 'Done.'
 

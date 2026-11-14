@@ -23,6 +23,7 @@ sqlite3 "$DB_FILE" <sql_drop.sqlight
 sqlite3 "$DB_FILE" <sql_init.sqlight
 sqlite3 "$DB_FILE" <sql_upload.sqlight
 sqlite3 "$DB_FILE" <sql_merge.sqlight
+sqlite3 "$DB_FILE" <sql_derived_stops.sqlight
 
 popd
 

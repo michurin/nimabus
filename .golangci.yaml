@@ -1,0 +1,43 @@
+version: "2"
+linters:
+  default: all
+  disable:
+    # too hard
+    - cyclop
+    - depguard
+    - gochecknoglobals
+    - godox
+    - ireturn
+    - mnd
+    - nlreturn
+    - noinlineerr
+    - revive
+    - varnamelen
+    - wsl
+    - wsl_v5
+    # deprecated
+    - exhaustruct
+    - gomodguard
+  settings:
+    tagliatelle:
+      case:
+        rules:
+          json: snake
+    gosec:
+      excludes:
+        - G104 # TODO
+        - G114 # TODO
+        - G706 # we do not work with personal data
+    errcheck:
+      exclude-functions: # TODO
+        - fmt.Fprint
+        - fmt.Fprintf
+        - (*database/sql.DB).Close
+        - (*database/sql.Rows).Close
+        - (*database/sql.Rows).Scan
+  exclusions:
+    rules:
+      - path: main.go
+        linters:
+          - err113
+        source: 'return wr\(fmt\.Errorf\(format, a\.\.\.\)\)'

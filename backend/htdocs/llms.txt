@@ -1,0 +1,27 @@
+# Limassol Bus Schedule & Smart Route Planner
+
+> Up-to-date public bus schedules, route planner, and transfer optimizer for Limassol, Cyprus (EMEL). Designed to help passengers find the fastest connections with minimal waiting times.
+
+## About the Project
+
+This web application provides real-time and static bus schedules for urban and suburban routes in Limassol, Cyprus.
+Unlike standard timetable PDFs, the interface is specifically engineered around point-to-point navigation,
+multi-leg transfer matching, and waiting-time minimization.
+
+- **Geographic Coverage:** Limassol District, Cyprus (City center, tourist coast, suburbs, and regional villages).
+- **Primary Operator:** EMEL (Limassol Passenger Transport Company).
+- **Target Audience:** Residents, tourists, expats, and daily commuters in Limassol.
+- **Languages:** English, Greek.
+
+## Core Features
+
+- [Smart Route Planner](/): Finds optimal A-to-B bus combinations with minimal transfer waiting times.
+
+## All bus stops and routes
+
+{{}}
+## Technical & Data Notes
+
+- Schedule data is structured around official EMEL timetables and stop coordinates.
+- Departure times represent scheduled stop arrivals.
+- Popular hubs indexed: My Mall, Old Hospital, Saint Raphael Resort, Limassol Marina, Parklane, Germasogeia, Mouttagiaka, Agios Tychonas.

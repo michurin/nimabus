@@ -4,11 +4,13 @@
 .tables
 
 .print "Loading..."
+.import agency.txt agency_
 .import calendar_dates.txt calendar_dates_
 .import routes.txt routes_
 .import stops.txt stops_
 .import stop_times.txt stop_times_
 .import trips.txt trips_
+.import translations.txt translations_
 .print "Fin."
 
 .print "Tables:"

@@ -2,17 +2,17 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	_ "embed"
+	"encoding/json"
 	"fmt"
-	"html"
 	"io"
-	"log"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"os"
-	"slices"
+	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -21,110 +21,75 @@ import (
 )
 
 //go:embed htdocs/index.html
-var page string
+var documentIndex []byte
+
+//go:embed htdocs/loader.svg
+var documentLoader []byte
 
 //go:embed htdocs/script.js
-var script string
+var documentScript []byte
 
 //go:embed htdocs/style.css
-var style string
+var documentStyle []byte
 
 //go:embed htdocs/favicon.ico
-var favicon []byte
+var documentFavicon []byte
 
-const yymd = "20060102"
+//go:embed htdocs/llms.txt
+var documentLlmsTxt []byte
 
-func writeStops(db *sql.DB, w io.Writer) error {
-	fmt.Fprint(w, `<h2>stops</h2>`)
-	rows, err := db.Query(`
-select
-    stop_id,
-    stop_name,
-    stop_lat,
-    stop_lon
-from stops
-order by stop_name, stop_id
-`)
+var replacerMarkdownEscaper = strings.NewReplacer(
+	`{`, `\{`, `}`, `\}`, `[`, `\[`, `]`, `\]`, `(`, `\(`, `)`, `\)`,
+	`<`, `&lt;`, `>`, `&gt;`, `+`, `\+`, `-`, `\-`, `\`, `\\`, "`", "\\`",
+	`*`, `\*`, `_`, `\_`, `#`, `\#`, `.`, `\.`, `!`, `\!`, `|`, `\|`, `~`, `\~`,
+)
+
+var replacerUnjson = strings.NewReplacer("[", "", "]", "", `"`, "", ",", ", ")
+
+// handlers
+
+func handlerVars(ctx context.Context, db *sql.DB, w io.Writer) error {
+	fmt.Fprint(w, "const generation = 'TODO'\n")
+	fmt.Fprint(w, "const dates = ")
+	current, err := varDates(ctx, db, w)
 	if err != nil {
-		return fmt.Errorf("stops list: db: %w", err)
+		return Wrf("stop info: %w", err)
 	}
-	defer rows.Close()
-	fmt.Fprintln(w, `<ul>`)
-	for rows.Next() {
-		var id int
-		var lat, lon float64
-		var name string
-		rows.Scan(&id, &name, &lat, &lon)
-		fmt.Fprintf(w, `<li><a id="stop_%[1]d"></a><button onclick="open_stop(%[1]d, true)">🚍 %[2]s</button> %[3]s<ul class="stop_body" id="stop_%[1]d_body"></ul></li>`, id, html.EscapeString(name), mapUrl(lat, lon))
+	fmt.Fprint(w, "var current_date = '"+current+"'\n")
+	fmt.Fprint(w, "const stops_info = ")
+	err = varStops(ctx, db, w)
+	if err != nil {
+		return Wrf("stop info: %w", err)
 	}
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("stops list fetching: db: %w", err)
-	}
-	fmt.Fprintln(w, `</ul>`)
 	return nil
 }
 
-func writeSchedule(db *sql.DB, w io.Writer, stopIDDate string) error {
-	stopIDStr, targetDate, ok := strings.Cut(stopIDDate, "/")
+func handlerTimetable(ctx context.Context, db *sql.DB, w io.Writer, p string) error {
+	type dto struct {
+		TripID         int    `json:"id"`
+		Time           string `json:"time"`
+		RouteShortName string `json:"route"`
+		Direction      int    `json:"dir"`
+	}
+	p, ok := strings.CutSuffix(p, ".json")
 	if !ok {
-		return fmt.Errorf("schedule: invalid URL: %q", stopIDDate)
+		return Wrf("invalid suffix: %q", p)
 	}
-	stopID, err := strconv.Atoi(stopIDStr)
+	date, stopStr, ok := strings.Cut(p, "/")
+	if !ok {
+		return Wrf("invalid format: %q", p)
+	}
+	stopID, err := strconv.Atoi(stopStr)
 	if err != nil {
-		return fmt.Errorf("schedule: stop id: %w", err)
+		return Wrf("invalid stopID: %w", err)
 	}
-	var dateA, dateB string
-	err = db.QueryRow(`select min(calendar_dates.date), max(calendar_dates.date) from calendar_dates`).Scan(&dateA, &dateB) // TODO for stopID
-	if err != nil {
-		return fmt.Errorf("schedule: date range: db: %w", err)
-	}
-
-	if targetDate == "today" {
-		targetDate = time.Now().Format(yymd)
-	}
-
-	fmt.Fprint(w, `<li>Dates<ul>`)
-	dateR, err := dateRange(dateA, dateB)
-	if err != nil {
-		return fmt.Errorf("schedule: date range: %w", err)
-	}
-	for _, v := range dateR {
-		p := ""
-		if v == targetDate {
-			p = ` style="filter: invert(1) hue-rotate(180deg);"`
-		}
-		wdt, err := time.Parse(yymd, v)
-		if err != nil {
-			return fmt.Errorf("schedule: time error: %w", err)
-		}
-		wd := wdt.Weekday()
-		fmt.Fprintf(w, `<li><button onclick="select_date(%[3]d, '%[5]s')"%[2]s><tt>📅 %[1]s %[4]s</tt></button></li>`, formatDate(v), p, stopID, wd.String()[:3], v)
-	}
-	fmt.Fprint(w, `</ul></li>`)
-
-	var stopName string
-	var stopLat float64
-	var stopLon float64
-	err = db.QueryRow(`
-select
-    stop_name,
-    stop_lat,
-    stop_lon
-from stops
-where stop_id = ?
-`, stopID).Scan(&stopName, &stopLat, &stopLon)
-	if err != nil {
-		return fmt.Errorf("schedule: stop info: db: %w", err)
-	}
-
-	rows, err := db.Query(`
+	// TODO we use arrival_time only
+	rows, err := db.QueryContext(ctx, `
 select
     trips.trip_id,
     routes.route_short_name,
     trips.direction_id,
-    stop_times.arrival_time,
-    routes.route_color,
-    routes.route_text_color
+    stop_times.arrival_time
 from
     stop_times inner join
     trips on stop_times.trip_id = trips.trip_id inner join
@@ -134,146 +99,338 @@ where
     stop_times.stop_id = ? and
     calendar_dates.date = ?
 order by stop_times.arrival_time
-`, stopID, targetDate)
+`, stopID, date)
 	if err != nil {
-		return fmt.Errorf("schedule: trip: db: %w", err)
+		return Wrf("schedule: trip: db: %w", err)
 	}
 	defer rows.Close()
-	fmt.Fprintf(w, `<li>Trips: <b>🚍 %s</b> %s<ul>`, html.EscapeString(stopName), mapUrl(stopLat, stopLon))
+	r := []dto(nil)
 	for rows.Next() {
-		var id int
-		var shortName string
-		var direction int
-		var aTime string
-		var color string
-		var bgColor string
-		rows.Scan(&id, &shortName, &direction, &aTime, &color, &bgColor)
-		fmt.Fprintf(w, `<li><button onclick="open_trip(%[5]d)"><tt>%[4]s</tt> <span style="color: #%[1]s; background-color: #%[2]s">%[3]s %[6]s</span></button><ul class="trip_body" id="trip_%[5]d_body"></ul></li>`, color, bgColor, html.EscapeString(shortName), removeSeconds(aTime), id, directionSign(direction))
+		var id, direction int
+		var shortName, aTime string
+		rows.Scan(&id, &shortName, &direction, &aTime)
+		r = append(r, dto{
+			TripID:         id,
+			Time:           aTime,
+			RouteShortName: shortName,
+			Direction:      direction,
+		})
 	}
 	if err := rows.Err(); err != nil {
-		return fmt.Errorf("schedule: trip fetching: db: %w", err)
+		return Wrf("schedule: trip fetching: db: %w", err)
 	}
-	fmt.Fprintln(w, `</ul></li>`)
+	err = json.NewEncoder(w).Encode(r)
+	if err != nil {
+		return Wrf("json encoder: %w", err)
+	}
 	return nil
 }
 
-func writeTrip(db *sql.DB, w io.Writer, tripIDStr string) error {
-	tripID, err := strconv.Atoi(tripIDStr)
+func handlerTrip(ctx context.Context, db *sql.DB, w io.Writer, p string) error {
+	type dto struct {
+		ID   int    `json:"id"`
+		Time string `json:"t"`
+	}
+	p, ok := strings.CutSuffix(p, ".json")
+	if !ok {
+		return Wrf("invalid suffix: %q", p)
+	}
+	tripID, err := strconv.Atoi(p)
 	if err != nil {
-		return fmt.Errorf("trip: invalid id: %w", err)
+		return Wrf("trip: invalid id: %w", err)
 	}
 
-	rows, err := db.Query(`
+	rows, err := db.QueryContext(ctx, `
 select
     stop_times.stop_id,
-    stop_times.arrival_time,
-    stops.stop_name,
-    stops.stop_lat,
-    stops.stop_lon
+    stop_times.arrival_time
 from
-    stop_times inner join
-    stops on stops.stop_id = stop_times.stop_id
+    stop_times
 where trip_id = ?
 order by stop_sequence
 `, tripID)
 	if err != nil {
-		return fmt.Errorf("trip: db: %w", err)
+		return Wrf("trip: db: %w", err)
 	}
 	defer rows.Close()
+	r := []dto{}
 	for rows.Next() {
 		var stopID int
 		var aTime string
-		var stopName string
-		var lat, lon float64
-		rows.Scan(&stopID, &aTime, &stopName, &lat, &lon)
-		fmt.Fprintf(w, `<li><button onclick="open_stop(%[3]d, false)">🚍 <tt>%[2]s</tt> %[1]s</button> %[4]s</li>`, html.EscapeString(stopName), removeSeconds(aTime), stopID, mapUrl(lat, lon))
+		rows.Scan(&stopID, &aTime)
+		r = append(r, dto{
+			ID:   stopID,
+			Time: aTime,
+		})
 	}
 	if err := rows.Err(); err != nil {
-		return fmt.Errorf("trip: db fetching: %w", err)
+		return Wrf("trip: db fetching: %w", err)
+	}
+	err = json.NewEncoder(w).Encode(r)
+	if err != nil {
+		return Wrf("marshal trip: %w", err)
 	}
 	return nil
 }
 
-func dateRange(dateA, dateB string) ([]string, error) {
-	a, err := time.Parse(yymd, dateA)
+func handlerStyle(ctx context.Context, db *sql.DB, w io.Writer) error {
+	rows, err := db.QueryContext(ctx, `
+select
+    route_short_name,
+    max(route_text_color),
+    max(route_color)
+from routes
+group by route_short_name
+order by route_short_name
+`)
 	if err != nil {
-		return nil, fmt.Errorf("data range: bound a: %w", err)
+		return Wrf("enrichCSS: db: %w", err)
 	}
-	b, err := time.Parse(yymd, dateB)
+	defer rows.Close()
+	_, err = io.Copy(w, bytes.NewReader(documentStyle))
 	if err != nil {
-		return nil, fmt.Errorf("data range: bound b: %w", err)
+		return Wrf("copy static: %w", err)
 	}
-	res := []string(nil)
-	for i := b.Add(12 * time.Hour); a.Before(i); i = i.Add(-24 * time.Hour) { // TODO limit
-		res = append(res, i.Format(yymd))
+	_, err = io.Copy(w, bytes.NewReader([]byte("\n\n// ** generated **\n\n")))
+	if err != nil {
+		return Wrf("copy comment: %w", err)
 	}
-	slices.Reverse(res)
-	return res, nil
-}
-
-func mapUrl(lat, lon float64) string {
-	return fmt.Sprintf(`<a href="https://google.com/maps?q=%s,%s" target="_blank">📍</a>`, url.QueryEscape(fmt.Sprintf("%g", lat)), url.QueryEscape(fmt.Sprintf("%g", lon)))
-}
-
-func removeSeconds(a string) string {
-	return a[0:max(0, len(a)-3)]
-}
-
-func formatDate(a string) string {
-	return a[4:6] + "/" + a[6:8]
-}
-
-func directionSign(a int) string {
-	if a == 0 {
-		return "◀"
+	for rows.Next() {
+		var name, fg, bg string
+		rows.Scan(&name, &fg, &bg)
+		fmt.Fprintf(w, ".r%s {color:#%s;background-color:#%s}\n", name, fg, bg)
 	}
-	return "▶"
+	if err := rows.Err(); err != nil {
+		return Wrf("db fetching: %w", err)
+	}
+	return nil
 }
+
+func handlerLlmsTxt(ctx context.Context, db *sql.DB, w io.Writer) error {
+	rows, err := db.QueryContext(ctx, `
+select
+    stop_id,
+    route_short_names,
+    stop_name,
+    stop_alt_name
+from derived_stops
+order by stop_id
+`)
+	if err != nil {
+		return Wrf("db: %w", err)
+	}
+	defer rows.Close()
+	buf := []byte(nil)
+	for rows.Next() {
+		var id int
+		var routes, name, altName string
+		rows.Scan(&id, &routes, &name, &altName)
+		if altName != "" {
+			altName = " (" + replacerMarkdownEscaper.Replace(altName) + ")"
+		}
+		name = replacerMarkdownEscaper.Replace(name)
+		routes = replacerMarkdownEscaper.Replace(replacerUnjson.Replace(routes))
+		buf = fmt.Appendf(buf, "- [%[2]s%[3]s](/stop/%[1]d): routes: %[4]s\n", id, name, altName, routes)
+	}
+	if err := rows.Err(); err != nil {
+		return Wrf("db fetching: %w", err)
+	}
+	_, err = io.Copy(w, bytes.NewReader(bytes.Replace(documentLlmsTxt, []byte("{{}}"), buf, 1)))
+	if err != nil {
+		return Wrf("write: %w", err)
+	}
+	return nil
+}
+
+// helpers for var handler
+
+func varStops(ctx context.Context, db *sql.DB, w io.Writer) error {
+	type dto struct {
+		ID        int             `json:"id"`
+		Routes    json.RawMessage `json:"routes"`
+		Name      string          `json:"name"`
+		Lat       float64         `json:"lat"`
+		Lon       float64         `json:"lon"`
+		AltName   string          `json:"alt_name"`
+		Distances json.RawMessage `json:"distances"`
+	}
+	rows, err := db.QueryContext(ctx, `
+select
+    stop_id,
+    route_short_names,
+    stop_name,
+    stop_lat,
+    stop_lon,
+    stop_alt_name,
+    distances
+from derived_stops
+`)
+	if err != nil {
+		return Wrf("writeVars: db: %w", err)
+	}
+	defer rows.Close()
+	data := map[string]dto{}
+	for rows.Next() {
+		var id int
+		var routes, name, altName, distances string
+		var lat, lon float64
+		rows.Scan(&id, &routes, &name, &lat, &lon, &altName, &distances)
+		data[strconv.Itoa(id)] = dto{
+			ID:        id,
+			Routes:    json.RawMessage(routes),
+			Name:      name,
+			Lat:       lat,
+			Lon:       lon,
+			AltName:   altName,
+			Distances: json.RawMessage(distances),
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return Wrf("writeVars: db fetching: %w", err)
+	}
+	err = json.NewEncoder(w).Encode(data)
+	if err != nil {
+		return Wrf("marshal stops_info: %w", err)
+	}
+	return nil
+}
+
+func varDates(ctx context.Context, db *sql.DB, w io.Writer) (string, error) {
+	const yymd = "20060102"
+	type dto struct {
+		ID   string `json:"id"`
+		Date string `json:"date"`
+	}
+	rows, err := db.QueryContext(ctx, `select date from calendar_dates order by date`)
+	if err != nil {
+		return "", Wrf("db: %w", err)
+	}
+	defer rows.Close()
+	current := time.Now().Format(yymd)
+	ok := false
+	data := []dto(nil)
+	for rows.Next() {
+		var date string
+		rows.Scan(&date)
+		if date == current {
+			ok = true
+		}
+		t, err := time.Parse(yymd, date)
+		if err != nil {
+			return "", Wrf("invalid date: %q: %w", date, err)
+		}
+		data = append(data, dto{ID: date, Date: t.Format("Jan 02 Mon")})
+	}
+	if err := rows.Err(); err != nil {
+		return "", Wrf("db fetching: %w", err)
+	}
+	if len(data) == 0 {
+		return "", Wrf("no data")
+	}
+	if !ok {
+		current = data[0].ID // just force first slot
+	}
+	err = json.NewEncoder(w).Encode(data)
+	if err != nil {
+		return "", Wrf("marshal: %w", err)
+	}
+	return current, nil
+}
+
+// main
 
 func main() {
 	addr := os.Args[1]
 	dbfile := os.Args[2]
-	fmt.Println("Opening database", dbfile)
-	db, err := sql.Open("sqlite3", dbfile)
+	slog.Info("Opening database: " + dbfile)
+	db, err := Wrc2(sql.Open("sqlite3", dbfile))
 	if err != nil {
-		log.Fatal(err)
+		slog.Error(err.Error())
+		return
 	}
 	defer db.Close()
 
+	stopRe := regexp.MustCompile(`^/stop/[0-9]{1,6}$`)
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 		p := r.URL.Path
-		fmt.Println("GET", p)
+		slog.Info("Request", slog.String("method", r.Method), slog.String("path", p))
 		var err error
 		switch {
-		case p == "/stops":
-			err = writeStops(db, w)
-		case strings.HasPrefix(p, "/schedule/"):
-			err = writeSchedule(db, w, p[10:])
-		case strings.HasPrefix(p, "/trip/"):
-			err = writeTrip(db, w, p[6:])
+		case strings.HasPrefix(p, "/api/timetable/"):
+			err = Wrc(handlerTimetable(ctx, db, w, p[15:]))
+		case strings.HasPrefix(p, "/api/trip/"):
+			err = Wrc(handlerTrip(ctx, db, w, p[10:]))
+		case p == "/vars.js":
+			w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+			err = Wrc(handlerVars(ctx, db, w))
 		case p == "/script.js":
 			w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
-			_, err = fmt.Fprint(w, script)
+			_, err = Wrc2(io.Copy(w, bytes.NewReader(documentScript)))
 		case p == "/style.css":
 			w.Header().Set("Content-Type", "text/css; charset=utf-8")
-			_, err = fmt.Fprint(w, style)
+			err = Wrc(handlerStyle(ctx, db, w))
 		case p == "/favicon.ico":
 			w.Header().Set("Content-Type", "image/x-icon")
-			_, err = io.Copy(w, bytes.NewReader(favicon))
-		case p == "/":
+			_, err = Wrc2(io.Copy(w, bytes.NewReader(documentFavicon)))
+		case p == "/llms.txt":
+			w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+			err = Wrc(handlerLlmsTxt(ctx, db, w))
+		case p == "/robots.txt":
+			w.Header().Set("Content-Type", "text/plain")
+			_, err = Wrc2(io.Copy(w, bytes.NewReader([]byte("User-agent: *\n"))))
+		case p == "/loader.svg":
+			w.Header().Set("Content-Type", "image/svg+xml")
+			_, err = Wrc2(io.Copy(w, bytes.NewReader(documentLoader)))
+		case p == "/" || stopRe.MatchString(p):
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			_, err = fmt.Fprint(w, page)
+			_, err = Wrc2(io.Copy(w, bytes.NewReader(documentIndex)))
 		default:
 			http.NotFound(w, r)
 		}
 		if err != nil {
-			log.Println(err)
+			slog.Error(err.Error())
 		}
 	})
 
-	fmt.Println("Starting at", addr)
+	slog.Info("Starting at " + addr)
 	err = http.ListenAndServe(addr, nil)
 	if err != nil {
 		slog.Error(err.Error())
 	}
+}
+
+// error handling utilities
+
+func wr(err error) error {
+	name := "nofunc"
+	pc, _, no, ok := runtime.Caller(2)
+	if ok {
+		details := runtime.FuncForPC(pc)
+		name = details.Name()
+	}
+	return fmt.Errorf("[%s:%d]: %w", name, no, err)
+}
+
+func Wr(err error) error {
+	return wr(err)
+}
+
+func Wrf(format string, a ...any) error {
+	return wr(fmt.Errorf(format, a...))
+}
+
+func Wrc(err error) error {
+	if err != nil {
+		err = wr(err)
+	}
+	return err
+}
+
+func Wrc2[T any](x T, err error) (T, error) {
+	if err != nil {
+		err = wr(err)
+	}
+	return x, err
 }
