@@ -12,8 +12,11 @@
 
 const titleEl = document.getElementById('title')
 const datesEl = document.getElementById('dates')
-const rootEl = document.getElementById('root')
+const staticEl = document.getElementById('static-body')
+const dynamicEl = document.getElementById('dynamic-body')
 const loaderEl = document.getElementById('loader')
+
+const baseTitle = 'NimaBus — ΝήμαBus'
 
 // state
 
@@ -33,11 +36,15 @@ function esc(x) {
 }
 
 async function fetchJson(url) {
-  const r = await fetch(url)
-  if (!r.ok) {
-    throw new Error(`Response is not ok: ${r.status}`)
+  try {
+    const r = await fetch(url)
+    if (!r.ok) {
+      throw new Error(`Response is not ok: ${r.status}`)
+    }
+    return await r.json()
+  } catch {
+    return false
   }
-  return await r.json()
 }
 
 function show_loader() {
@@ -78,15 +85,20 @@ function time_line(pfx, id, t, r, d) {
 
 async function time_lines_all(l, id) {
   const sh = await fetchJson(`/api/timetable/${current_date}/${id}.json`)
-  return sh.map((x) => time_line(l, x.id, x.time, x.route, x.dir)).join('\n')
+  if (sh) {
+    return sh.map((x) => time_line(l, x.id, x.time, x.route, x.dir)).join('\n')
+  }
+  return '' // TODO show error message
 }
 
 // render pages (in fact, parts of page)
 
 function root_page() {
   scope = 'root'
-  titleEl.innerText = 'All stops'
-  rootEl.innerHTML = '<ul>' +
+  document.title = baseTitle + ' — Limassol buses'
+  titleEl.innerText = 'All Limassol stops'
+  staticEl.innerHTML = '' // TODO last visited?
+  dynamicEl.innerHTML = '<ul>' +
     Object.keys(stops_info).sort((a, b) => {
       const parse = s => {
         const m = s.match(/^(\d*)\s*(.*)$/)
@@ -100,24 +112,33 @@ function root_page() {
       }) || x.number - y.number
     }).map((x) => stop_line('label', x)).join('\n') +
     '</ul>'
+  window.scrollTo(0, 0)
 }
 
-async function stop_page(id) {
+async function stop_page_dynamic(id) {
   show_loader()
-  scope = 'stop'
-  current_stop = id
-  const si = stops_info[id]
-  titleEl.innerHTML = esc(si.name) + (si.alt_name ? '<br>' + esc(si.alt_name) : '')
-  rootEl.innerHTML = '<button onclick="act_root(event)">all</button><h2>Nearby</h2><ul>' +
-    si.distances.map((x) => stop_line('walk', x.id, x.m)).join('\n') +
-    '</ul><h2>Timetable</h2><ul>' +
-    (await time_lines_all('bus', id)) +
-    '</ul>'
+  dynamicEl.innerHTML = '<h2>Timetable</h2><ul>' + (await time_lines_all('bus', id)) + '</ul>'
   hide_loader()
 }
 
+async function stop_page(id) {
+  scope = 'stop'
+  current_stop = id
+  const si = stops_info[id]
+  document.title = baseTitle + ' — ' + esc(si.name) + (si.alt_name ? ' — ' + esc(si.alt_name) : '')
+  titleEl.innerHTML = esc(si.name) + (si.alt_name ? '<br>' + esc(si.alt_name) : '')
+  staticEl.innerHTML = '<h2>' +
+    '<a onclick="act_root(event)">◀ Back to all stops</a> ⸽ ' +
+    '<a onclick="toggle_hidding(event, \'stop-page-walking\')">Nearby ▾</a>' +
+    '</h2>' +
+    '<ul id="stop-page-walking" style="display:none">' +
+    si.distances.map((x) => stop_line('walk', x.id, x.m)).join('\n') + '</ul>'
+  await stop_page_dynamic(id)
+  window.scrollTo(0, 0)
+}
+
 function date_page() {
-  datesEl.innerHTML = dates.map((x) => `<button onclick="act_date(event, '${esc(x.id)}')""${x.id === current_date ? ' style="color:red"' : ''}><tt>${esc(x.date)}</tt></button>`).join('\n')
+  datesEl.innerHTML = dates.map((x) => `<button onclick="act_date(event, '${esc(x.id)}')""${x.id === current_date ? ' style="filter: invert(1) hue-rotate(180deg);"' : ''}><tt>${esc(x.date).replaceAll(' ', '<br>')}</tt></button>`).join('\n')
 }
 
 // events
@@ -162,7 +183,7 @@ function act_date(ev, id) {
   if (scope === 'root') {
     root_page()
   } else {
-    stop_page(current_stop)
+    stop_page_dynamic(current_stop)
   }
 }
 
@@ -193,7 +214,9 @@ async function act_trip(ev, pfx, id) {
   if (e.childElementCount === 0) {
     show_loader()
     const sh = await fetchJson(`/api/trip/${id}.json`)
-    e.innerHTML = sh.map((x) => stop_line(pfx, x.id, false, x.t)).join('\n')
+    if (sh) {
+      e.innerHTML = sh.map((x) => stop_line(pfx, x.id, false, x.t)).join('\n')
+    } // TODO show error message
     hide_loader()
   } else {
     e.innerHTML = ''
@@ -211,5 +234,16 @@ function act_walk(ev, pfx, id) {
     )).join('\n')
   } else {
     e.innerHTML = ''
+  }
+}
+
+// universal utilities
+
+function toggle_hidding(ev, id) {
+  ev.stopPropagation()
+  ev.preventDefault()
+  const x = document.getElementById(id)
+  if (x) {
+    x.style.display = x.style.display === 'none' ? '' : 'none'
   }
 }

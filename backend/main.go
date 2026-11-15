@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -111,7 +112,7 @@ order by stop_times.arrival_time
 		rows.Scan(&id, &shortName, &direction, &aTime)
 		r = append(r, dto{
 			TripID:         id,
-			Time:           aTime,
+			Time:           strings.TrimSuffix(aTime, ":00"),
 			RouteShortName: shortName,
 			Direction:      direction,
 		})
@@ -355,8 +356,29 @@ func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		p := r.URL.Path
-		slog.Info("Request", slog.String("method", r.Method), slog.String("path", p))
+		ua := r.Header.Get("User-Agent")
+		ip := r.Header.Get("X-Real-IP") // proxy_set_header X-Real-IP $remote_addr;
 		var err error
+		defer func() {
+			// TODO log user agent and remote IP
+			a := []any{slog.String("method", r.Method), slog.String("path", p)}
+			if len(ua) > 0 {
+				a = append(a, slog.String("user_agent", ua))
+			}
+			if len(ip) > 0 {
+				a = append(a, slog.String("real_ip", ip))
+			}
+			l := slog.LevelInfo
+			if err != nil {
+				a = append(a, slog.String("error", err.Error()))
+				if errors.Is(err, os.ErrNotExist) {
+					l = slog.LevelWarn
+				} else {
+					l = slog.LevelError
+				}
+			}
+			slog.Log(ctx, l, "Request", a...)
+		}()
 		switch {
 		case strings.HasPrefix(p, "/api/timetable/"):
 			err = Wrc(handlerTimetable(ctx, db, w, p[15:]))
@@ -388,9 +410,7 @@ func main() {
 			_, err = Wrc2(io.Copy(w, bytes.NewReader(documentIndex)))
 		default:
 			http.NotFound(w, r)
-		}
-		if err != nil {
-			slog.Error(err.Error())
+			err = os.ErrNotExist
 		}
 	})
 
