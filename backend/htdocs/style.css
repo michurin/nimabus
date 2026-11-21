@@ -1,92 +1,883 @@
+/* ==========================================================================
+   NimaBus — Industrial Transit UI
+   Theme colors, layout, components and responsive rules
+   ========================================================================== */
+
+
+/* ==========================================================================
+   1. Theme variables
+   ========================================================================== */
+
+:root {
+  /* Dark theme is the default. */
+  color-scheme: dark;
+
+  --bg: #1e262c;
+  --surface: #273139;
+  --surface-raised: #303c44;
+  --surface-hover: #394750;
+
+  --text: #e7ecef;
+  --muted: #9aa8b0;
+  --subtle: #74838c;
+
+  --border: #414e57;
+  --border-strong: #596872;
+
+  --accent: #e3a04b;
+  --accent-strong: #f0b15d;
+  --danger: #d96b65;
+
+  --shadow: 0 12px 32px rgb(0 0 0 / 18%);
+  --focus: 0 0 0 3px rgb(227 160 75 / 30%);
+
+  --radius: 6px;
+  --content-width: 980px;
+
+  --font-ui:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+
+  --font-mono:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+
+  font-family: var(--font-ui);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+
+/* Light theme follows the operating system preference by default. */
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+
+    --bg: #edf0f1;
+    --surface: #ffffff;
+    --surface-raised: #f5f7f8;
+    --surface-hover: #e8edef;
+
+    --text: #273139;
+    --muted: #63717a;
+    --subtle: #829099;
+
+    --border: #d5dde1;
+    --border-strong: #b9c5cb;
+
+    --accent: #bd762b;
+    --accent-strong: #a9611c;
+    --danger: #b94d49;
+
+    --shadow: 0 10px 28px rgb(35 48 56 / 9%);
+    --focus: 0 0 0 3px rgb(189 118 43 / 22%);
+  }
+}
+
+
+/* The checked toggle selects the opposite of the system theme. */
+@media (prefers-color-scheme: dark) {
+  :root:has(#theme-toggle:checked) {
+    color-scheme: light;
+
+    --bg: #edf0f1;
+    --surface: #ffffff;
+    --surface-raised: #f5f7f8;
+    --surface-hover: #e8edef;
+
+    --text: #273139;
+    --muted: #63717a;
+    --subtle: #829099;
+
+    --border: #d5dde1;
+    --border-strong: #b9c5cb;
+
+    --accent: #bd762b;
+    --accent-strong: #a9611c;
+    --danger: #b94d49;
+
+    --shadow: 0 10px 28px rgb(35 48 56 / 9%);
+    --focus: 0 0 0 3px rgb(189 118 43 / 22%);
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  :root:has(#theme-toggle:checked) {
+    color-scheme: dark;
+
+    --bg: #1e262c;
+    --surface: #273139;
+    --surface-raised: #303c44;
+    --surface-hover: #394750;
+
+    --text: #e7ecef;
+    --muted: #9aa8b0;
+    --subtle: #74838c;
+
+    --border: #414e57;
+    --border-strong: #596872;
+
+    --accent: #e3a04b;
+    --accent-strong: #f0b15d;
+    --danger: #d96b65;
+
+    --shadow: 0 12px 32px rgb(0 0 0 / 18%);
+    --focus: 0 0 0 3px rgb(227 160 75 / 30%);
+  }
+}
+
+
+/* ==========================================================================
+   2. Base styles and page layout
+   ========================================================================== */
+
+* {
+  box-sizing: border-box;
+}
+
 html {
+  min-width: 320px;
   scroll-behavior: smooth;
+  scrollbar-color: var(--border-strong) var(--bg);
 }
 
 body {
-  font-family: Arial, Helvetica, sans-serif;
+  position: relative;
+
+  width: min(calc(100% - 40px), var(--content-width));
+  min-height: 100vh;
+
+  margin: 0 auto;
+  padding: 26px 0 64px;
+
+  color: var(--text);
+  background: var(--bg);
+
+  font-size: 15px;
+  line-height: 1.55;
+
+  transition:
+    color 0.18s ease,
+    background-color 0.18s ease;
 }
 
-li {
+/* Subtle technical grid in the page background. */
+body::before {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+
+  content: "";
+  pointer-events: none;
+
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+
+  background-size: 36px 36px;
+  opacity: 0.09;
+}
+
+
+/* ==========================================================================
+   3. Application header and brand
+   ========================================================================== */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+
+  border-bottom: 1px solid var(--border);
+}
+
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+
+  min-width: 0;
+}
+
+.app-brand-mark {
+  display: grid;
+  place-items: center;
+
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+
+  color: var(--accent-strong);
+
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.08em;
+}
+
+.app-brand-copy {
+  min-width: 0;
+}
+
+.app-brand-name {
+  display: block;
+
+  color: var(--text);
+
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.app-brand-caption {
+  display: block;
+
+  margin-top: 3px;
+
+  color: var(--muted);
+
+  font: 10px/1.2 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Keep the brand spans independent from general inline content. */
+.app-brand span {
+  display: block;
+  min-width: 0;
+
+  margin: 0;
+  padding: 0;
+
+  border: 0;
+  border-radius: 0;
+
+  font-weight: inherit;
+  text-align: left;
+}
+
+.app-brand .app-brand-mark {
+  display: grid !important;
+}
+
+
+/* ==========================================================================
+   4. Theme switch
+   ========================================================================== */
+
+.theme-control {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Visually hide the checkbox but keep it keyboard-accessible. */
+#theme-toggle {
+  position: absolute;
+
+  width: 1px;
+  height: 1px;
+
+  margin: -1px;
+  padding: 0;
+
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
   white-space: nowrap;
+
+  border: 0;
 }
 
-a {
-  text-decoration: none;
+.theme-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  min-height: 38px;
+  padding: 0 12px;
+
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+
+  color: var(--text);
+  background: var(--surface);
+
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+
   cursor: pointer;
-}
-
-a:not([target]):hover {
-  text-decoration: underline;
-}
-
-h2 a {
   user-select: none;
-  border-radius: 0.4lh;
-  padding-left: 0.2lh;
-  padding-right: 0.2lh;
 }
 
-h2 a:not([target]):hover {
-  text-decoration: none;
-  background-color: #ff0;
+.theme-toggle-label:hover {
+  border-color: var(--accent);
+  background: var(--surface-hover);
 }
 
-span {
-  font-size: 90%;
-  border-radius: 0.4lh;
-  padding-left: 0.2lh;
-  padding-right: 0.2lh;
-  font-weight: bold;
-  display: inline-block;
-  min-width: 2lh;
+.theme-toggle-label::before {
+  color: var(--accent-strong);
+  content: "◐";
+  font-size: 16px;
+}
+
+#theme-toggle:focus-visible + .theme-toggle-label {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+
+/* ==========================================================================
+   5. Date navigation
+   ========================================================================== */
+
+#dates {
+  display: flex;
+  align-items: stretch;
+  gap: 7px;
+
+  max-width: 100%;
+  margin: 0 0 24px;
+  padding: 0 0 7px;
+
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+#dates button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 66px;
+  min-height: 46px;
+
+  padding: 7px 11px;
+
+  border: 1px solid var(--border);
+  border-radius: 4px;
+
+  color: var(--muted);
+  background: var(--surface);
+
   text-align: center;
 }
 
-button span {
-  font-size: 110%;
-  margin: 2px;
+#dates button:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
 }
 
-button {
-  white-space: nowrap;
-  text-align: left;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* The original script marks the active date using an inline filter. */
+#dates button[style*="invert"] {
+  border-color: var(--accent);
+
+  color: var(--accent-strong);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+
+/* ==========================================================================
+   6. Page title and section headings
+   ========================================================================== */
+
+#title {
+  margin: 0 0 22px;
+  padding: 0 0 15px;
+
+  border-bottom: 1px solid var(--border);
+
+  color: var(--text);
+
+  font-size: clamp(25px, 4vw, 34px);
+  font-weight: 750;
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+
+  overflow-wrap: anywhere;
+}
+
+#title::before {
+  display: block;
+
+  margin-bottom: 8px;
+
+  color: var(--accent-strong);
+  content: "LIMASSOL / TRANSIT NETWORK";
+
+  font: 700 10px var(--font-mono);
+  letter-spacing: 0.16em;
+}
+
+h2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+
+  margin: 24px 0 12px;
+
+  color: var(--text);
+
+  font-size: 16px;
+  font-weight: 750;
+}
+
+h2 a {
+  display: inline-flex;
+  align-items: center;
+
+  min-height: 34px;
+  padding: 5px 9px;
+
+  border: 1px solid var(--border);
+  border-radius: 4px;
+
+  color: var(--muted);
+  background: var(--surface);
+
+  font-size: 12px;
+  font-weight: 650;
+}
+
+h2 a:hover {
+  border-color: var(--accent);
+
+  color: var(--accent-strong);
+  background: var(--surface-hover);
+
+  text-decoration: none;
+}
+
+
+/* ==========================================================================
+   7. Route lists and content cards
+   ========================================================================== */
+
+#static-body > ul,
+#dynamic-body > ul,
+#static-body ul,
+#dynamic-body ul {
+  margin: 0;
+  padding: 0;
+
+  list-style: none;
+}
+
+#dynamic-body > ul > li,
+#static-body > ul > li {
+  margin: 0 0 8px;
+  padding: 12px 14px;
+
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 5%);
+
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+#dynamic-body > ul > li:hover,
+#static-body > ul > li:hover {
+  border-color: var(--border-strong);
+}
+
+/* Nested lists are visually separated from their parent item. */
+#static-body li > ul,
+#dynamic-body li > ul {
+  margin: 10px 0 0 8px;
+  padding: 8px 0 0 13px;
+
+  border-left: 2px solid var(--border);
+}
+
+#static-body li > ul:empty,
+#dynamic-body li > ul:empty,
+ul[hidden] {
+  display: none !important;
+}
+
+#static-body li > ul > li,
+#dynamic-body li > ul > li {
+  margin: 0 0 7px;
+  padding: 5px 0;
+
+  border-bottom: 1px solid var(--border);
+}
+
+#static-body li > ul > li:last-child,
+#dynamic-body li > ul > li:last-child {
+  border-bottom: 0;
+}
+
+li {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+
+/* ==========================================================================
+   8. Links and buttons
+   ========================================================================== */
+
+a {
+  color: var(--accent-strong);
+  text-decoration: none;
   cursor: pointer;
 }
 
-#dates {
-  padding: .1em;
-  border: 1px solid #000;
-  max-width: 100%;
-  white-space: nowrap;
-  overflow-x: auto;
-  overflow-y: visible;
+a:hover {
+  text-decoration: underline;
 }
+
+a[target="_blank"] {
+  color: var(--muted);
+}
+
+a[target="_blank"]:hover {
+  color: var(--accent-strong);
+}
+
+button {
+  max-width: 100%;
+  min-height: 32px;
+
+  margin: 2px 3px 2px 0;
+  padding: 5px 9px;
+
+  overflow: hidden;
+
+  border: 1px solid var(--border);
+  border-radius: 4px;
+
+  color: var(--text);
+  background: var(--surface-raised);
+
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.35;
+
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: normal;
+
+  cursor: pointer;
+
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+button:hover {
+  border-color: var(--accent);
+  background: var(--surface-hover);
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+
+/* ==========================================================================
+   9. Route badges
+   ========================================================================== */
+
+/*
+   Route badge colors, backgrounds and borders are provided by backend CSS.
+   These rules only control badge dimensions, spacing and typography.
+   Do not add color, background or border declarations here.
+*/
+
+span[class^="r"],
+span[class*=" r"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 27px;
+  min-height: 22px;
+
+  margin: 2px 3px 2px 0;
+  padding: 2px 7px;
+
+  border-radius: 3px;
+
+  font: 800 11px var(--font-mono);
+  letter-spacing: 0.02em;
+
+  text-align: center;
+  vertical-align: middle;
+}
+
+button span[class^="r"],
+button span[class*=" r"] {
+  margin: 0 0 0 5px;
+}
+
+
+/* ==========================================================================
+   10. Monospace text and identifiers
+   ========================================================================== */
+
+tt {
+  color: var(--text);
+
+  font: 0.95em var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.015em;
+}
+
+button tt {
+  color: var(--accent-strong);
+  font-weight: 800;
+}
+
+
+/* ==========================================================================
+   11. Text input fields
+   ========================================================================== */
+
+/* Inputs generated inside the static content area. */
+#static-body input[type="text"] {
+  display: block;
+
+  width: 100%;
+  max-width: 100%;
+  min-height: 40px;
+
+  margin: 8px 0;
+  padding: 9px 12px;
+
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+
+  color: var(--text);
+  background: var(--surface);
+
+  font: inherit;
+  line-height: 1.4;
+
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+#static-body input[type="text"]:hover {
+  border-color: var(--accent);
+}
+
+#static-body input[type="text"]:focus {
+  outline: none;
+
+  border-color: var(--accent);
+  box-shadow: var(--focus);
+}
+
+#static-body input[type="text"]::placeholder {
+  color: var(--subtle);
+  opacity: 1;
+}
+
+#static-body input[type="text"]:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+
+/* ==========================================================================
+   12. Loader and error message
+   ========================================================================== */
 
 #loader {
   display: none;
-  opacity: 0;
-  transition: opacity .5s ease;
   position: fixed;
+  z-index: 9999;
+
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 9999;
-  width: 50vmin;
-  height: 50vmin;
-  object-fit: contain;
-}
 
-@keyframes blink {
-    0% { color: rgba(255,255,255,1) }
-    50% { color: rgba(255,255,255,0.5) }
-    100% { color: rgba(255,255,255,1) }
+  width: 76px;
+  height: 76px;
+  padding: 16px;
+
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+
+  background: var(--surface);
+  box-shadow: var(--shadow);
+
+  opacity: 0;
+  object-fit: contain;
+
+  transform: translate(-50%, -50%);
+  transition: opacity 0.18s ease;
 }
 
 #error {
-  background-color: #900;
-  color: #fff;
-  font-weight: bold;
-  animation: blink normal 1.5s infinite ease-in-out;
+  margin: 0 0 16px;
+  padding: 11px 14px;
+
+  border: 1px solid var(--danger);
+  border-left: 3px solid var(--danger);
+  border-radius: 4px;
+
+  color: var(--text);
+  background: color-mix(in srgb, var(--danger) 13%, var(--surface));
+
+  font-weight: 650;
+}
+
+
+/* ==========================================================================
+   13. Focus and text selection
+   ========================================================================== */
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+::selection {
+  color: var(--bg);
+  background: var(--accent);
+}
+
+
+/* ==========================================================================
+   14. Responsive layout
+   ========================================================================== */
+
+@media (max-width: 600px) {
+  body {
+    width: min(calc(100% - 24px), var(--content-width));
+    padding-top: 16px;
+
+    font-size: 14px;
+  }
+
+  .app-header {
+    margin-bottom: 18px;
+  }
+
+  .app-brand-caption {
+    font-size: 9px;
+  }
+
+  .theme-toggle-label {
+    min-height: 36px;
+    padding: 0 9px;
+
+    font-size: 11px;
+  }
+
+  #dates {
+    margin-bottom: 18px;
+  }
+
+  #dates button {
+    min-width: 59px;
+    min-height: 43px;
+
+    padding: 6px 8px;
+  }
+
+  #title {
+    margin-bottom: 18px;
+    font-size: 26px;
+  }
+
+  #dynamic-body > ul > li,
+  #static-body > ul > li {
+    padding: 10px;
+  }
+
+  button {
+    min-height: 34px;
+  }
+}
+
+
+/* ==========================================================================
+   15. Reduced motion accessibility
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ==========================================================================
+   16. Current stop
+   ========================================================================== */
+
+@keyframes current-stop-background-pulse {
+  0%, 100% {
+    background-color: var(--surface);
+  }
+
+  50% {
+    background-color: color-mix(
+      in srgb,
+      var(--accent) 18%,
+      var(--surface)
+    );
+  }
+}
+
+#static-body li.current_stop > a:not([target="_blank"]),
+#dynamic-body li.current_stop > a:not([target="_blank"]) {
+  display: inline-block;
+  padding: 4px 1px;
+  margin: -4px -1px;
+  border-radius: var(--radius);
+  animation: current-stop-background-pulse 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #static-body li.current_stop,
+  #dynamic-body li.current_stop {
+    animation: none;
+  }
 }
