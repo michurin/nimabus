@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	_ "embed"
+	"embed"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -21,23 +20,24 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-//go:embed htdocs/index.html
-var documentIndex []byte
-
-//go:embed htdocs/loader.svg
-var documentLoader []byte
-
-//go:embed htdocs/script.js
-var documentScript []byte
-
 //go:embed htdocs/style.css
 var documentStyle []byte
 
-//go:embed htdocs/favicon.ico
-var documentFavicon []byte
-
 //go:embed htdocs/llms.txt
 var documentLlmsTxt []byte
+
+//go:embed htdocs/apple-touch-icon.png
+//go:embed htdocs/favicon.ico
+//go:embed htdocs/icon-192.png
+//go:embed htdocs/icon-512.png
+//go:embed htdocs/index.html
+//go:embed htdocs/loader.svg
+//go:embed htdocs/manifest.json
+//go:embed htdocs/robots.txt
+//go:embed htdocs/script.js
+var htdocs embed.FS
+
+const htdocsDir = "htdocs/"
 
 var replacerMarkdownEscaper = strings.NewReplacer(
 	`{`, `\{`, `}`, `\}`, `[`, `\[`, `]`, `\]`, `(`, `\(`, `)`, `\)`,
@@ -161,7 +161,7 @@ order by stop_sequence
 		rows.Scan(&stopID, &aTime)
 		r = append(r, dto{
 			ID:   stopID,
-			Time: aTime,
+			Time: strings.TrimSuffix(aTime, ":00"),
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -338,6 +338,29 @@ func varDates(ctx context.Context, db *sql.DB, w io.Writer) (string, error) {
 	return current, nil
 }
 
+// static handlers
+
+func buildStaticHandlers() (map[string]http.Handler, error) {
+	m := map[string]http.Handler{}
+	now := time.Now()
+	l, err := htdocs.ReadDir("htdocs")
+	if err != nil {
+		return nil, Wrf("static listing: %w", err)
+	}
+	for _, e := range l {
+		filename := e.Name()
+		slog.Info("Loading", slog.String("file", filename))
+		faviconBytes, err := htdocs.ReadFile(htdocsDir + filename)
+		if err != nil {
+			return nil, Wrf("static loading: %w", err)
+		}
+		m["/"+filename] = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.ServeContent(w, r, filename, now, bytes.NewReader(faviconBytes))
+		})
+	}
+	return m, nil
+}
+
 // main
 
 func main() {
@@ -353,15 +376,22 @@ func main() {
 
 	stopRe := regexp.MustCompile(`^/stop/[0-9]{1,6}$`)
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	staticMap, err := buildStaticHandlers()
+	if err != nil {
+		slog.Error(err.Error())
+		return
+	}
+	indexHandler := staticMap["/index.html"]
+
+	http.HandleFunc("/", func(wo http.ResponseWriter, r *http.Request) {
+		w := wrapResponseWriter(wo)
 		ctx := r.Context()
 		p := r.URL.Path
 		ua := r.Header.Get("User-Agent")
 		ip := r.Header.Get("X-Real-IP") // proxy_set_header X-Real-IP $remote_addr;
 		var err error
 		defer func() {
-			// TODO log user agent and remote IP
-			a := []any{slog.String("method", r.Method), slog.String("path", p)}
+			a := []any{slog.String("method", r.Method), slog.String("path", p), slog.Int("status", w.code), slog.Int("size", w.size)}
 			if len(ua) > 0 {
 				a = append(a, slog.String("user_agent", ua))
 			}
@@ -371,14 +401,14 @@ func main() {
 			l := slog.LevelInfo
 			if err != nil {
 				a = append(a, slog.String("error", err.Error()))
-				if errors.Is(err, os.ErrNotExist) {
-					l = slog.LevelWarn
-				} else {
-					l = slog.LevelError
-				}
+				l = slog.LevelError
 			}
 			slog.Log(ctx, l, "Request", a...)
 		}()
+		if h, ok := staticMap[p]; ok {
+			h.ServeHTTP(w, r)
+			return
+		}
 		switch {
 		case strings.HasPrefix(p, "/api/timetable/"):
 			err = Wrc(handlerTimetable(ctx, db, w, p[15:]))
@@ -387,30 +417,16 @@ func main() {
 		case p == "/vars.js":
 			w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 			err = Wrc(handlerVars(ctx, db, w))
-		case p == "/script.js":
-			w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
-			_, err = Wrc2(io.Copy(w, bytes.NewReader(documentScript)))
 		case p == "/style.css":
 			w.Header().Set("Content-Type", "text/css; charset=utf-8")
 			err = Wrc(handlerStyle(ctx, db, w))
-		case p == "/favicon.ico":
-			w.Header().Set("Content-Type", "image/x-icon")
-			_, err = Wrc2(io.Copy(w, bytes.NewReader(documentFavicon)))
 		case p == "/llms.txt":
 			w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
 			err = Wrc(handlerLlmsTxt(ctx, db, w))
-		case p == "/robots.txt":
-			w.Header().Set("Content-Type", "text/plain")
-			_, err = Wrc2(io.Copy(w, bytes.NewReader([]byte("User-agent: *\n"))))
-		case p == "/loader.svg":
-			w.Header().Set("Content-Type", "image/svg+xml")
-			_, err = Wrc2(io.Copy(w, bytes.NewReader(documentLoader)))
-		case p == "/" || stopRe.MatchString(p):
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			_, err = Wrc2(io.Copy(w, bytes.NewReader(documentIndex)))
+		case p == "/" || p == "/index.html" || stopRe.MatchString(p):
+			indexHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
-			err = os.ErrNotExist
 		}
 	})
 
@@ -419,6 +435,41 @@ func main() {
 	if err != nil {
 		slog.Error(err.Error())
 	}
+}
+
+// http utils
+
+func wrapResponseWriter(h http.ResponseWriter) *responseWriter {
+	return &responseWriter{
+		next: h,
+		code: http.StatusOK,
+	}
+}
+
+type responseWriter struct {
+	next http.ResponseWriter
+	code int
+	size int
+	err  error
+}
+
+func (rw *responseWriter) Header() http.Header {
+	return rw.next.Header()
+}
+
+func (rw *responseWriter) Write(data []byte) (int, error) {
+	n, err := rw.next.Write(data)
+	if err != nil {
+		rw.err = err
+	} else {
+		rw.size += n
+	}
+	return n, err
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.code = code
+	rw.next.WriteHeader(code)
 }
 
 // error handling utilities
