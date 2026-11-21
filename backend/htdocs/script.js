@@ -15,6 +15,7 @@ const datesEl = document.getElementById('dates')
 const staticEl = document.getElementById('static-body')
 const dynamicEl = document.getElementById('dynamic-body')
 const loaderEl = document.getElementById('loader')
+const errorEl = document.getElementById('error')
 
 const baseTitle = 'NimaBus — ΝήμαBus'
 
@@ -59,10 +60,10 @@ function hide_loader() {
 
 // renders
 
-function stop_line(pfx, id, m, t) {
+function stop_line(pfx, id, m, t, active) {
   const v = stops_info[id]
   const lab = `${pfx}_${id}`
-  return '<li>' +
+  return `<li${active ? ' class="current_stop"' : ''}>` +
     (m ? '' : `<button onclick="act_walk(event, '${lab}', ${id})">🚶</button> `) +
     `<button onclick="act_timetable(event, '${lab}', ${id})">🚍</button> ` +
     (t ? `<tt>🚍 ${t}</tt> ` : '') +
@@ -70,15 +71,15 @@ function stop_line(pfx, id, m, t) {
     `<a onclick="act_stop(event, ${id})">` +
     esc(v.name) +
     '</a>' +
-    `<a target="_blank" href="https://google.com/maps?q=${v.lat},${v.lon}">📍</a><br>` +
+    `<a target="_blank" href="https://maps.google.com/maps?q=loc:${v.lat},${v.lon}">📍</a><br>` +
     v.routes.map((x) => `<span class="r${esc(x)}">${esc(x)}</span>`).join('\n') +
     `<ul id="${lab}"></ul></li>`
 }
 
-function time_line(pfx, id, t, r, d) {
+function time_line(pfx, id, t, r, d, stop_id) { // stop_id just for tracking
   const lab = `${pfx}_${id}`
   return '<li>' +
-    `<button onclick="act_trip(event, '${lab}', ${id})"><tt>${esc(t)}</tt> ` +
+    `<button onclick="act_trip(event, '${lab}', ${id}, ${stop_id})"><tt>${esc(t)}</tt> ` +
     `<span class="r${esc(r)}">${esc(r)} ${d === 0 ? '◀' : '▶'}</span></button>` +
     `<ul id="${lab}"></ul></li>`
 }
@@ -86,9 +87,10 @@ function time_line(pfx, id, t, r, d) {
 async function time_lines_all(l, id) {
   const sh = await fetchJson(`/api/timetable/${current_date}/${id}.json`)
   if (sh) {
-    return sh.map((x) => time_line(l, x.id, x.time, x.route, x.dir)).join('\n')
+    return sh.map((x) => time_line(l, x.id, x.time, x.route, x.dir, id)).join('\n')
   }
-  return '' // TODO show error message
+  show_error()
+  return ''
 }
 
 // render pages (in fact, parts of page)
@@ -97,7 +99,7 @@ function root_page() {
   scope = 'root'
   document.title = baseTitle + ' — Limassol buses'
   titleEl.innerText = 'All Limassol stops'
-  staticEl.innerHTML = '' // TODO last visited?
+  staticEl.innerHTML = '<input type="text" oninput="act_search(event)" placeholder="Search..."></input>'
   dynamicEl.innerHTML = '<ul>' +
     Object.keys(stops_info).sort((a, b) => {
       const parse = s => {
@@ -179,7 +181,6 @@ function act_date(ev, id) {
   ev.preventDefault()
   current_date = id
   date_page()
-  // TODO update other parts of page
   if (scope === 'root') {
     root_page()
   } else {
@@ -207,7 +208,7 @@ async function act_timetable(ev, pfx, id) {
   }
 }
 
-async function act_trip(ev, pfx, id) {
+async function act_trip(ev, pfx, id, stop_id) {
   ev.stopPropagation()
   ev.preventDefault()
   const e = document.getElementById(`${pfx}`)
@@ -215,8 +216,10 @@ async function act_trip(ev, pfx, id) {
     show_loader()
     const sh = await fetchJson(`/api/trip/${id}.json`)
     if (sh) {
-      e.innerHTML = sh.map((x) => stop_line(pfx, x.id, false, x.t)).join('\n')
-    } // TODO show error message
+      e.innerHTML = sh.map((x) => stop_line(pfx, x.id, false, x.t, x.id === stop_id)).join('\n')
+    } else {
+      show_error()
+    }
     hide_loader()
   } else {
     e.innerHTML = ''
@@ -235,6 +238,19 @@ function act_walk(ev, pfx, id) {
   } else {
     e.innerHTML = ''
   }
+}
+
+function act_search(ev) {
+  ev.stopPropagation()
+  ev.preventDefault()
+  const t = ev.target.value
+  console.log(t) // TODO: search
+}
+
+// errors
+
+function show_error() {
+  errorEl.style.display = 'block'
 }
 
 // universal utilities
