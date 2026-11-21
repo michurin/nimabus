@@ -3,16 +3,58 @@
 <head>
   <meta charset="UTF-8">
   <title>NimaBus — ΝήμαBus</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.json">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="/style.css" />
+  <meta name="theme-color" content="#596872">
 </head>
 <body>
-  <div id="error" style="display:none;">test error</div>
+  <header class="app-header">
+    <div class="app-brand">
+      <span class="app-brand-mark" aria-hidden="true">NB</span>
+      <span class="app-brand-copy">
+        <span class="app-brand-name">NimaBus</span>
+        <span class="app-brand-caption">Limassol transit network</span>
+      </span>
+    </div>
+
+    <div class="theme-control">
+      <input type="checkbox" id="theme-toggle" aria-label="Switch between light and dark themes">
+      <label class="theme-toggle-label" for="theme-toggle">Change theme</label>
+    </div>
+  </header>
+
+  <div id="error" style="display:none;">Some error. Reload the page please.</div>
   <div id="dates">...</div>
   <h1 id="title">...</h1>
   <div id="static-body">...</div>
   <div id="dynamic-body">...</div>
   <img id="loader" style="display:none;" src="/loader.svg">
+
+  <!-- Localize the theme control without modifying the application scripts. -->
+  <script>
+    (() => {
+      const isGreek = navigator.language.toLowerCase().startsWith("el");
+      const label = document.querySelector(".theme-toggle-label");
+      const toggle = document.getElementById("theme-toggle");
+
+      if (label) {
+        label.textContent = isGreek ? "Αλλαγή θέματος" : "Change theme";
+      }
+
+      if (toggle) {
+        toggle.setAttribute(
+          "aria-label",
+          isGreek
+            ? "Εναλλαγή μεταξύ φωτεινού και σκοτεινού θέματος"
+            : "Switch between light and dark themes"
+        );
+      }
+    })();
+  </script>
+
   <script src="/vars.js"></script>
   <script src="/script.js"></script>
 </body>
