@@ -196,7 +196,15 @@ window.addEventListener('popstate', (ev) => {
   } else {
     root_page()
   }
+
+  // index
   Object.values(stops_info).forEach((v) => { index.add(v.id, v.name, v.alt_name) })
+
+  // localization
+  if (navigator.language.toLowerCase().startsWith('el')) {
+    document.getElementById('theme-toggle-label').textContent = 'Αλλαγή θέματος'
+    document.getElementById('theme-toggle').setAttribute('aria-label', 'Εναλλαγή μεταξύ φωτεινού και σκοτεινού θέματος')
+  }
 })()
 
 // actions

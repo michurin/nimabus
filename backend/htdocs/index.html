@@ -21,8 +21,8 @@
     </div>
 
     <div class="theme-control">
-      <input type="checkbox" id="theme-toggle" aria-label="Switch between light and dark themes">
-      <label class="theme-toggle-label" for="theme-toggle">Change theme</label>
+      <input id="theme-toggle" type="checkbox" aria-label="Switch between light and dark themes">
+      <label id="theme-toggle-label" class="theme-toggle-label" for="theme-toggle">Change theme</label>
     </div>
   </header>
 
@@ -32,28 +32,6 @@
   <div id="static-body">...</div>
   <div id="dynamic-body">...</div>
   <img id="loader" style="display:none;" src="/loader.svg">
-
-  <!-- Localize the theme control without modifying the application scripts. -->
-  <script>
-    (() => {
-      const isGreek = navigator.language.toLowerCase().startsWith("el");
-      const label = document.querySelector(".theme-toggle-label");
-      const toggle = document.getElementById("theme-toggle");
-
-      if (label) {
-        label.textContent = isGreek ? "Αλλαγή θέματος" : "Change theme";
-      }
-
-      if (toggle) {
-        toggle.setAttribute(
-          "aria-label",
-          isGreek
-            ? "Εναλλαγή μεταξύ φωτεινού και σκοτεινού θέματος"
-            : "Switch between light and dark themes"
-        );
-      }
-    })();
-  </script>
 
   <script type="module" src="/script.js"></script>
 </body>
