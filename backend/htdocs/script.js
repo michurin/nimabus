@@ -8,6 +8,9 @@
 /*eslint prefer-arrow-callback: "error"*/
 /*eslint arrow-body-style: "error"*/
 
+import { generation, dates, current_date, stops_info } from './vars.js'
+import { StringNgramIndex } from './ngramindex.js'
+
 // constants
 
 const titleEl = document.getElementById('title')
@@ -19,10 +22,32 @@ const errorEl = document.getElementById('error')
 
 const baseTitle = 'NimaBus — ΝήμαBus'
 
+const index = new StringNgramIndex({
+  ngramLen: 3, normalizer: text => [
+    text.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+  ]
+})
+
+const ordered_stops = Object.keys(stops_info).sort((a, b) => {
+  const parse = s => {
+    const m = s.match(/^(\d*)\s*(.*)$/)
+    return { n: Number(m[1] || 0), t: m[2] }
+  }
+  const x = parse(stops_info[a].name)
+  const y = parse(stops_info[b].name)
+  return x.t.localeCompare(y.t, undefined, {
+    sensitivity: 'base',
+    numeric: true
+  }) || x.number - y.number
+})
+
+const cache = {}
+
 // state
 
 let scope = 'root'
-let current_stop = 0
+let current_stop = 0 // on scope != root
+let filtered = undefined // on scope == root
 
 // helpers
 
@@ -37,12 +62,18 @@ function esc(x) {
 }
 
 async function fetchJson(url) {
+  const v = cache[url]
+  if (v) {
+    return v
+  }
   try {
     const r = await fetch(url)
     if (!r.ok) {
       throw new Error(`Response is not ok: ${r.status}`)
     }
-    return await r.json()
+    const x = await r.json()
+    cache[url] = x
+    return x
   } catch {
     return false
   }
@@ -62,10 +93,10 @@ function hide_loader() {
 
 function stop_line(pfx, id, m, t, active) {
   const v = stops_info[id]
-  const lab = `${pfx}_${id}`
+  const lab = `${pfx}_stop_${id}`
   return `<li${active ? ' class="current_stop"' : ''}>` +
-    (m ? '' : `<button onclick="act_walk(event, '${lab}', ${id})">🚶</button> `) +
-    `<button onclick="act_timetable(event, '${lab}', ${id})">🚍</button> ` +
+    (m ? '' : `<button onclick="act_walk(event, '${lab}_walks', ${id}, '${lab}_buses')">🚶</button> `) +
+    `<button onclick="act_timetable(event, '${lab}_buses', ${id}, '${lab}_walks')">🚍</button> ` +
     (t ? `<tt>🚍 ${t}</tt> ` : '') +
     (m ? `<tt>🚶 ${m}m</tt> &rarr; ` : '') +
     `<a onclick="act_stop(event, ${id})">` +
@@ -73,11 +104,11 @@ function stop_line(pfx, id, m, t, active) {
     '</a>' +
     `<a target="_blank" href="https://maps.google.com/maps?q=loc:${v.lat},${v.lon}">📍</a><br>` +
     v.routes.map((x) => `<span class="r${esc(x)}">${esc(x)}</span>`).join('\n') +
-    `<ul id="${lab}"></ul></li>`
+    `<ul id="${lab}_walks"></ul><ul id="${lab}_buses"></ul></li>`
 }
 
 function time_line(pfx, id, t, r, d, stop_id) { // stop_id just for tracking
-  const lab = `${pfx}_${id}`
+  const lab = `${pfx}_trip_${id}`
   return '<li>' +
     `<button onclick="act_trip(event, '${lab}', ${id}, ${stop_id})"><tt>${esc(t)}</tt> ` +
     `<span class="r${esc(r)}">${esc(r)} ${d === 0 ? '◀' : '▶'}</span></button>` +
@@ -93,6 +124,19 @@ async function time_lines_all(l, id) {
   return ''
 }
 
+function stop_lines_all(a) { // it's NOT universal, useful in lists that allows filtering
+  if (a && a.length > 0) {
+    filtered = true
+  } else {
+    if (filtered === false) { // do not consider undefined
+      return // do nothing, list is already full
+    }
+    a = ordered_stops
+    filtered = false
+  }
+  dynamicEl.innerHTML = `<ul>${a.map((x) => stop_line('root', x)).join('\n')}</li>`
+}
+
 // render pages (in fact, parts of page)
 
 function root_page() {
@@ -100,20 +144,7 @@ function root_page() {
   document.title = baseTitle + ' — Limassol buses'
   titleEl.innerText = 'All Limassol stops'
   staticEl.innerHTML = '<input type="text" oninput="act_search(event)" placeholder="Search..."></input>'
-  dynamicEl.innerHTML = '<ul>' +
-    Object.keys(stops_info).sort((a, b) => {
-      const parse = s => {
-        const m = s.match(/^(\d*)\s*(.*)$/)
-        return { n: Number(m[1] || 0), t: m[2] }
-      }
-      const x = parse(stops_info[a].name)
-      const y = parse(stops_info[b].name)
-      return x.t.localeCompare(y.t, undefined, {
-        sensitivity: 'base',
-        numeric: true
-      }) || x.number - y.number
-    }).map((x) => stop_line('label', x)).join('\n') +
-    '</ul>'
+  stop_lines_all()
   window.scrollTo(0, 0)
 }
 
@@ -165,6 +196,7 @@ window.addEventListener('popstate', (ev) => {
   } else {
     root_page()
   }
+  Object.values(stops_info).forEach((v) => { index.add(v.id, v.name, v.alt_name) })
 })()
 
 // actions
@@ -195,13 +227,14 @@ function act_root(ev) {
   root_page()
 }
 
-async function act_timetable(ev, pfx, id) {
+async function act_timetable(ev, pfx, id, clean) {
   ev.stopPropagation()
   ev.preventDefault()
+  document.getElementById(`${clean}`).innerHTML = ''
   const e = document.getElementById(`${pfx}`)
   if (e.childElementCount === 0) {
     show_loader()
-    e.innerHTML = await time_lines_all(`${pfx}_bus`, id)
+    e.innerHTML = await time_lines_all(`${pfx}`, id)
     hide_loader()
   } else {
     e.innerHTML = ''
@@ -226,25 +259,24 @@ async function act_trip(ev, pfx, id, stop_id) {
   }
 }
 
-function act_walk(ev, pfx, id) {
+function act_walk(ev, pfx, id, clean) {
   ev.stopPropagation()
   ev.preventDefault()
-  const l = `${pfx}_walk`
+  document.getElementById(`${clean}`).innerHTML = ''
   const e = document.getElementById(`${pfx}`)
+  const l = `${pfx}`
   if (e.childElementCount === 0) {
-    e.innerHTML = (stops_info[id]?.distances || []).map((x) => stop_line(
-      l, x.id, x.m
-    )).join('\n')
+    e.innerHTML = (stops_info[id]?.distances || []).map((x) => stop_line(l, x.id, x.m)).join('\n')
   } else {
     e.innerHTML = ''
   }
 }
 
-function act_search(ev) {
+function act_search(ev) { // it works on root page only
   ev.stopPropagation()
   ev.preventDefault()
-  const t = ev.target.value
-  console.log(t) // TODO: search
+  const a = index.search(ev.target.value)
+  stop_lines_all(a)
 }
 
 // errors
@@ -263,3 +295,15 @@ function toggle_hidding(ev, id) {
     x.style.display = x.style.display === 'none' ? '' : 'none'
   }
 }
+
+// hack, however i'm considering it useful as sort of declaration of public actions
+
+window.act_search = act_search
+window.act_walk = act_walk
+window.act_timetable = act_timetable
+window.act_date = act_date
+window.act_stop = act_stop
+window.act_trip = act_trip
+window.act_root = act_root
+
+window.toggle_hidding = toggle_hidding

@@ -33,6 +33,7 @@ var documentLlmsTxt []byte
 //go:embed htdocs/index.html
 //go:embed htdocs/loader.svg
 //go:embed htdocs/manifest.json
+//go:embed htdocs/ngramindex.js
 //go:embed htdocs/robots.txt
 //go:embed htdocs/script.js
 var htdocs embed.FS
@@ -50,14 +51,14 @@ var replacerUnjson = strings.NewReplacer("[", "", "]", "", `"`, "", ",", ", ")
 // handlers
 
 func handlerVars(ctx context.Context, db *sql.DB, w io.Writer) error {
-	fmt.Fprint(w, "const generation = 'TODO'\n")
-	fmt.Fprint(w, "const dates = ")
+	fmt.Fprint(w, "export const generation = 'TODO'\n")
+	fmt.Fprint(w, "export const dates = ")
 	current, err := varDates(ctx, db, w)
 	if err != nil {
 		return Wrf("stop info: %w", err)
 	}
-	fmt.Fprint(w, "var current_date = '"+current+"'\n")
-	fmt.Fprint(w, "const stops_info = ")
+	fmt.Fprint(w, "export var current_date = '"+current+"'\n")
+	fmt.Fprint(w, "export const stops_info = ")
 	err = varStops(ctx, db, w)
 	if err != nil {
 		return Wrf("stop info: %w", err)
@@ -361,29 +362,11 @@ func buildStaticHandlers() (map[string]http.Handler, error) {
 	return m, nil
 }
 
-// main
+// router
 
-func main() {
-	addr := os.Args[1]
-	dbfile := os.Args[2]
-	slog.Info("Opening database: " + dbfile)
-	db, err := Wrc2(sql.Open("sqlite3", dbfile))
-	if err != nil {
-		slog.Error(err.Error())
-		return
-	}
-	defer db.Close()
-
+func mux(db *sql.DB, staticMap map[string]http.Handler, indexHandler http.Handler) http.Handler {
 	stopRe := regexp.MustCompile(`^/stop/[0-9]{1,6}$`)
-
-	staticMap, err := buildStaticHandlers()
-	if err != nil {
-		slog.Error(err.Error())
-		return
-	}
-	indexHandler := staticMap["/index.html"]
-
-	http.HandleFunc("/", func(wo http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(wo http.ResponseWriter, r *http.Request) {
 		w := wrapResponseWriter(wo)
 		ctx := r.Context()
 		p := r.URL.Path
@@ -391,7 +374,12 @@ func main() {
 		ip := r.Header.Get("X-Real-IP") // proxy_set_header X-Real-IP $remote_addr;
 		var err error
 		defer func() {
-			a := []any{slog.String("method", r.Method), slog.String("path", p), slog.Int("status", w.code), slog.Int("size", w.size)}
+			a := []any{
+				slog.Int("code", w.code),
+				slog.Int("size", w.size),
+				slog.String("method", r.Method),
+				slog.String("path", p),
+			}
 			if len(ua) > 0 {
 				a = append(a, slog.String("user_agent", ua))
 			}
@@ -429,6 +417,34 @@ func main() {
 			http.NotFound(w, r)
 		}
 	})
+}
+
+// main
+
+func main() {
+	params, err := getParams("NIMABUS_BIND", "NIMABUS_DSN")
+	if err != nil {
+		slog.Error(err.Error())
+		return
+	}
+	addr := params[0]
+	dbfile := params[1]
+	slog.Info("Opening database: " + dbfile)
+	db, err := Wrc2(sql.Open("sqlite3", dbfile))
+	if err != nil {
+		slog.Error(err.Error())
+		return
+	}
+	defer db.Close()
+
+	staticMap, err := buildStaticHandlers()
+	if err != nil {
+		slog.Error(err.Error())
+		return
+	}
+	indexHandler := staticMap["/index.html"]
+
+	http.Handle("/", mux(db, staticMap, indexHandler))
 
 	slog.Info("Starting at " + addr)
 	err = http.ListenAndServe(addr, nil)
@@ -437,12 +453,33 @@ func main() {
 	}
 }
 
+// env utils
+
+func getParams(names ...string) ([]string, error) {
+	r := make([]string, len(names))
+	e := make([]string, 0, len(names))
+	for i, n := range names {
+		v, ok := os.LookupEnv(n)
+		if !ok {
+			e = append(e, n)
+		}
+		r[i] = v
+		slog.Info("Using variable", slog.String("var", n), slog.String("value", v))
+	}
+	if len(e) > 0 {
+		return nil, Wrf("no variable: %s", strings.Join(e, ", "))
+	}
+	return r, nil
+}
+
 // http utils
 
 func wrapResponseWriter(h http.ResponseWriter) *responseWriter {
 	return &responseWriter{
 		next: h,
 		code: http.StatusOK,
+		size: 0,
+		err:  nil,
 	}
 }
 
@@ -460,6 +497,7 @@ func (rw *responseWriter) Header() http.Header {
 func (rw *responseWriter) Write(data []byte) (int, error) {
 	n, err := rw.next.Write(data)
 	if err != nil {
+		err = Wrf("middleware: %w", err)
 		rw.err = err
 	} else {
 		rw.size += n
