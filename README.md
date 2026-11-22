@@ -43,6 +43,19 @@ Open <http://localhost:8112> in your browser.
 - **HTML over the wire.** This approach makes certain UI features difficult to implement, such as lists of recently viewed stops. Switching to a JSON API with client-side rendering would address this.
 - **Incremental UI updates.** These can lead to inconsistencies when the underlying data changes.
 
+### Grand Redevelopment
+
+At the moment, the backend data structure almost entirely mirrors the GTFS structure.
+
+This causes two problems:
+
+- Queries become unnecessarily complicated.
+- Merging data from different bus operators — or even data from the same operator downloaded on different days — becomes risky and unpredictable due to inconsistent foreign keys.
+
+There is really only one solution: design and implement data model that can support multiple updates from different sources.
+
+I think this can wait until we have some real-world experience with the site and a clearer understanding of all the requirements.
+
 ### Nice to have
 
 - List of recently viewed stops
