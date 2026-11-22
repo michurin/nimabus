@@ -28,18 +28,33 @@ const index = new StringNgramIndex({
   ]
 })
 
-const ordered_stops = Object.keys(stops_info).sort((a, b) => {
-  const parse = s => {
-    const m = s.match(/^(\d*)\s*(.*)$/)
-    return { n: Number(m[1] || 0), t: m[2] }
+function order_stops(ids) {
+  ids.sort((a, b) => {
+    const parse = s => {
+      const m = s.match(/^(\d*)\s*(.*)$/)
+      return { n: Number(m[1] || 0), t: m[2] }
+    }
+    const x = parse(stops_info[a].name)
+    const y = parse(stops_info[b].name)
+    return x.t.localeCompare(y.t, undefined, {
+      sensitivity: 'base',
+      numeric: true
+    }) || x.n - y.n
+  })
+  return ids
+}
+
+const ordered_stops = order_stops(Object.keys(stops_info))
+
+const index_by_stop = {}
+
+Object.values(stops_info).forEach((e) => e.routes.forEach((p) => {
+  if (!index_by_stop[p]) {
+    index_by_stop[p] = []
   }
-  const x = parse(stops_info[a].name)
-  const y = parse(stops_info[b].name)
-  return x.t.localeCompare(y.t, undefined, {
-    sensitivity: 'base',
-    numeric: true
-  }) || x.number - y.number
-})
+  index_by_stop[p].push(e.id)
+}))
+Object.keys(index_by_stop).forEach((k) => { index_by_stop[k] = order_stops(index_by_stop[k]) })
 
 const cache = {}
 
@@ -283,8 +298,12 @@ function act_walk(ev, pfx, id, clean) {
 function act_search(ev) { // it works on root page only
   ev.stopPropagation()
   ev.preventDefault()
-  const a = index.search(ev.target.value)
-  stop_lines_all(a)
+  const v = ev.target.value.trim()
+  if (index_by_stop[v]) {
+    stop_lines_all(index_by_stop[v])
+  } else {
+    stop_lines_all(index.search(v))
+  }
 }
 
 // errors
