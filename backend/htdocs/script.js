@@ -173,7 +173,7 @@ async function stop_page(id) {
   scope = 'stop'
   current_stop = id
   const si = stops_info[id]
-  document.title = baseTitle + ' — ' + esc(si.name) + (si.alt_name ? ' — ' + esc(si.alt_name) : '')
+  document.title = esc(si.name) + (si.alt_name ? ' — ' + esc(si.alt_name) : '') + ' — ' + baseTitle
   titleEl.innerHTML = esc(si.name) + (si.alt_name ? '<br>' + esc(si.alt_name) : '')
   staticEl.innerHTML = '<h2>' +
     '<a onclick="act_root(event)">◀ Back to all stops</a> ⸽ ' +
