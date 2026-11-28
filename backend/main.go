@@ -378,7 +378,7 @@ func buildStaticHandlers() (map[string]http.Handler, error) {
 
 func generation(ctx context.Context, db *sql.DB) (int, error) {
 	var c int
-	err := db.QueryRowContext(ctx, "select generation_id from system_generations order by generation_id desc;").Scan(&c)
+	err := db.QueryRowContext(ctx, "select generation_id from system_generations order by generation_id desc").Scan(&c)
 	if err != nil {
 		return 0, Wrf("db: %w", err)
 	}
