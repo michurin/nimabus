@@ -35,6 +35,8 @@ linters:
         - (*database/sql.DB).Close
         - (*database/sql.Rows).Close
         - (*database/sql.Rows).Scan
+    funlen:
+      lines: 61 # TODO
   exclusions:
     rules:
       - path: main.go

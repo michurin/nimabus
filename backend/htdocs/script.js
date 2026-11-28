@@ -88,7 +88,7 @@ async function fetchJson(url) {
       throw new Error(`Response is not ok: ${r.status}`)
     }
     const g = +r.headers.get('minabus-data-generation')
-    if (g && g != generation) {
+    if (g && g !== generation) {
       show_error() // oh. Hackish: we control UI on transport layer
     }
     const x = await r.json()
