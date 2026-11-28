@@ -3,7 +3,6 @@
    Theme colors, layout, components and responsive rules
    ========================================================================== */
 
-
 /* ==========================================================================
    1. Theme variables
    ========================================================================== */
@@ -563,6 +562,7 @@ a[target="_blank"] {
 
 a[target="_blank"]:hover {
   color: var(--accent-strong);
+  text-decoration: none;
 }
 
 button {
