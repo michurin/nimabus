@@ -9,75 +9,15 @@ begin immediate;
 
 -- {{{1 Cleanup
 
-.print 'Cleanup'
+.print 'Cleanup (naive truncate)'
 
-.print 'Cleaning calendar_dates (based on new data)'
-select count(*) from calendar_dates;
-delete from calendar_dates
-where service_id in (
-    select calendar_dates.service_id
-    from
-        calendar_dates left join
-        calendar_dates_ on
-            calendar_dates.date = calendar_dates_.date and
-            calendar_dates.service_id != calendar_dates_.service_id
-    where calendar_dates_.service_id is not null
-);
-select count(*) from calendar_dates;
-
-.print 'Cleaning calendar_dates (keep last days only) [TODO]'
-
-.print 'Cleaning trips'
-select count(*) from trips;
-delete from trips
-where trip_id in (
-    select trips.trip_id
-    from
-        trips left join
-        calendar_dates on trips.service_id = calendar_dates.service_id
-    where calendar_dates.service_id is null
-);
-select count(*) from trips;
-
-.print 'Cleaning routes'
-select count(*) from routes;
-delete from routes
-where route_id in (
-    select distinct routes.route_id
-    from
-        routes left join
-        trips on routes.route_id = trips.route_id
-    where trips.route_id is null
-);
-select count(*) from routes;
-
-.print 'Cleaning stop_times'
-select count(*) from stop_times;
-delete from stop_times
-where stop_id in (
-    select distinct stop_times.stop_id
-    from
-        stop_times left join
-        trips on stop_times.trip_id = trips.trip_id
-    where trips.trip_id is null
-);
-select count(*) from stop_times;
-
-.print 'Cleaning stops'
-select count(*) from stops;
-delete from stops
-where stop_id in (
-    select stops.stop_id
-    from
-        stops left join
-        stop_times on stops.stop_id = stop_times.stop_id
-    where stop_times.stop_id is null
-);
-select count(*) from stops;
-
-.print 'Create generation'
-
-insert into system_generations (generation_id) values (null);
+delete from agency;
+delete from calendar_dates;
+delete from routes;
+delete from stop_times;
+delete from stops;
+delete from translations;
+delete from trips;
 
 .print 'Upserting'
 
@@ -85,24 +25,21 @@ insert into system_generations (generation_id) values (null);
 
 .print 'Upserting: agency'
 select count(*) from agency;
-with g as (select max(generation_id) as id from system_generations)
 replace into agency (
     agency_id,
     agency_name,
     agency_url,
     agency_timezone,
     agency_lang,
-    agency_phone,
-    generation_id
+    agency_phone
 ) select
     cast(agency_id as integer),
     agency_name,
     agency_url,
     agency_timezone,
     agency_lang,
-    agency_phone,
-    g.id
-from agency_ inner join g;
+    agency_phone
+from agency_;
 drop table agency_;
 select count(*) from agency;
 
@@ -110,18 +47,15 @@ select count(*) from agency;
 
 .print 'Upserting: calendar_dates'
 select count(*) from calendar_dates;
-with g as (select max(generation_id) as id from system_generations)
 replace into calendar_dates (
     service_id,
     date,
-    exception_type,
-    generation_id
+    exception_type
 ) select
     cast(service_id as integer),
     date,
-    cast(exception_type as integer),
-    g.id
-from calendar_dates_ inner join g;
+    cast(exception_type as integer)
+from calendar_dates_;
 drop table calendar_dates_;
 select count(*) from calendar_dates;
 
@@ -129,7 +63,6 @@ select count(*) from calendar_dates;
 
 .print 'Upserting: routes'
 select count(*) from routes;
-with g as (select max(generation_id) as id from system_generations)
 replace into routes (
     route_id,
     agency_id,
@@ -138,8 +71,7 @@ replace into routes (
     route_desc,
     route_type,
     route_color,
-    route_text_color,
-    generation_id
+    route_text_color
 ) select
     cast(route_id as integer),
     cast(agency_id as integer),
@@ -148,9 +80,8 @@ replace into routes (
     route_desc,
     cast(route_type as integer),
     route_color,
-    route_text_color,
-    g.id
-from routes_ inner join g;
+    route_text_color
+from routes_;
 drop table routes_;
 select count(*) from routes;
 
@@ -158,7 +89,6 @@ select count(*) from routes;
 
 .print 'Upserting: stop_times'
 select count(*) from stop_times;
-with g as (select max(generation_id) as id from system_generations)
 replace into stop_times (
     trip_id,
     arrival_time,
@@ -166,8 +96,7 @@ replace into stop_times (
     stop_id,
     stop_sequence,
     pickup_type,
-    drop_off_type,
-    generation_id
+    drop_off_type
 ) select
     cast(trip_id as integer),
     arrival_time,
@@ -175,9 +104,8 @@ replace into stop_times (
     cast(stop_id as integer),
     cast(stop_sequence as integer),
     cast(pickup_type as integer),
-    cast(drop_off_type as integer),
-    g.id
-from stop_times_ inner join g;
+    cast(drop_off_type as integer)
+from stop_times_;
 drop table stop_times_;
 select count(*) from stop_times;
 
@@ -185,7 +113,6 @@ select count(*) from stop_times;
 
 .print 'Upserting: stops'
 select count(*) from stops;
-with g as (select max(generation_id) as id from system_generations)
 replace into stops (
     stop_id,
     stop_code,
@@ -193,8 +120,7 @@ replace into stops (
     stop_desc,
     stop_lat,
     stop_lon,
-    zone_id,
-    generation_id
+    zone_id
 ) select
     cast(stop_id as integer),
     cast(stop_code as integer),
@@ -202,9 +128,8 @@ replace into stops (
     stop_desc,
     cast(stop_lat as real),
     cast(stop_lon as real),
-    cast(zone_id as integer),
-    g.id
-from stops_ inner join g;
+    cast(zone_id as integer)
+from stops_;
 drop table stops_;
 select count(*) from stops;
 
@@ -212,24 +137,21 @@ select count(*) from stops;
 
 .print 'Upserting: trips'
 select count(*) from trips;
-with g as (select max(generation_id) as id from system_generations)
 replace into trips (
     route_id,
     service_id,
     trip_id,
     trip_headsign,
     shape_id,
-    direction_id,
-    generation_id
+    direction_id
 ) select
     cast(route_id as integer),
     cast(service_id as integer),
     cast(trip_id as integer),
     trip_headsign,
     cast(shape_id as integer),
-    cast(direction_id as integer),
-    g.id
-from trips_ inner join g;
+    cast(direction_id as integer)
+from trips_;
 drop table trips_;
 select count(*) from trips;
 
@@ -237,22 +159,19 @@ select count(*) from trips;
 
 .print 'Upserting: translations'
 select count(*) from translations;
-with g as (select max(generation_id) as id from system_generations)
 replace into translations (
     table_name,
     field_name,
     language,
     translation,
-    record_id,
-    generation_id
+    record_id
 ) select
     table_name,
     field_name,
     language,
     translation,
-    cast(record_id as integer),
-    g.id
-from translations_ inner join g;
+    cast(record_id as integer)
+from translations_;
 drop table translations_;
 select count(*) from translations;
 

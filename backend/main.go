@@ -51,7 +51,11 @@ var replacerUnjson = strings.NewReplacer("[", "", "]", "", `"`, "", ",", ", ")
 // handlers
 
 func handlerVars(ctx context.Context, db *sql.DB, w io.Writer) error {
-	fmt.Fprint(w, "export const generation = 'TODO'\n")
+	gen, err := generation(ctx, db)
+	if err != nil {
+		return Wrf("generation: %w", err)
+	}
+	fmt.Fprintf(w, "export const generation = %d\n", gen)
 	fmt.Fprint(w, "export const dates = ")
 	current, err := varDates(ctx, db, w)
 	if err != nil {
@@ -66,7 +70,11 @@ func handlerVars(ctx context.Context, db *sql.DB, w io.Writer) error {
 	return nil
 }
 
-func handlerTimetable(ctx context.Context, db *sql.DB, w io.Writer, p string) error {
+func handlerTimetable(ctx context.Context, db *sql.DB, w http.ResponseWriter, p string) error {
+	err := generationHeaders(ctx, db, w)
+	if err != nil {
+		return Wrf("headers: %w", err)
+	}
 	type dto struct {
 		TripID         int    `json:"id"`
 		Time           string `json:"time"`
@@ -128,7 +136,11 @@ order by stop_times.arrival_time
 	return nil
 }
 
-func handlerTrip(ctx context.Context, db *sql.DB, w io.Writer, p string) error {
+func handlerTrip(ctx context.Context, db *sql.DB, w http.ResponseWriter, p string) error {
+	err := generationHeaders(ctx, db, w)
+	if err != nil {
+		return Wrf("headers: %w", err)
+	}
 	type dto struct {
 		ID   int    `json:"id"`
 		Time string `json:"t"`
@@ -360,6 +372,26 @@ func buildStaticHandlers() (map[string]http.Handler, error) {
 		})
 	}
 	return m, nil
+}
+
+// util
+
+func generation(ctx context.Context, db *sql.DB) (int, error) {
+	var c int
+	err := db.QueryRowContext(ctx, "select generation_id from system_generations order by generation_id desc;").Scan(&c)
+	if err != nil {
+		return 0, Wrf("db: %w", err)
+	}
+	return c, nil
+}
+
+func generationHeaders(ctx context.Context, db *sql.DB, w http.ResponseWriter) error {
+	c, err := generation(ctx, db)
+	if err != nil {
+		return Wrf("generation: %w", err)
+	}
+	w.Header().Add("Minabus-data-generation", strconv.Itoa(c))
+	return nil
 }
 
 // router

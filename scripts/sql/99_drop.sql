@@ -6,6 +6,7 @@ drop table if exists stop_times;
 drop table if exists stops;
 drop table if exists trips;
 drop table if exists translations;
+drop table if exists derived_stops;
 
 .print 'Tables left:'
 .tables

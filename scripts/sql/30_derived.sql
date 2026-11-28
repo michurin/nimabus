@@ -1,4 +1,6 @@
 -- CAUTION: we consider *all* dates
+-- CAUTION: it have to be in same transuction
+
 drop table if exists derived_stops;
 create table if not exists derived_stops (
     stop_id integer primary key,

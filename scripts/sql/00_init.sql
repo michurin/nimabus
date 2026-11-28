@@ -1,79 +1,73 @@
 .print 'Createing: system_generations'
 create table system_generations (
     generation_id integer primary key autoincrement,
-    created_at text default current_timestamp
+    checksum      text    not null unique,
+    created_at    text    default current_timestamp
 );
 .print 'Createing: agency'
 create table agency (
-    agency_id integer primary key,
-    agency_name text,
-    agency_url text,
+    agency_id       integer primary key,
+    agency_name     text,
+    agency_url      text,
     agency_timezone text,
-    agency_lang text,
-    agency_phone text,
-    generation_id integer
+    agency_lang     text,
+    agency_phone    text
 );
 .print 'Createing: calendar_dates'
 create table calendar_dates (
-    service_id integer,
-    date text,
+    service_id     integer,
+    date           text,
     exception_type integer,
-    generation_id integer,
     primary key (service_id, date)
 );
 .print 'Createing: routes'
 create table routes (
-    route_id integer primary key,
-    agency_id integer,
+    route_id         integer primary key,
+    agency_id        integer,
     route_short_name text,
-    route_long_name text,
-    route_desc text,
-    route_type integer,
-    route_color text,
-    route_text_color text,
-    generation_id integer
+    route_long_name  text,
+    route_desc       text,
+    route_type       integer,
+    route_color      text,
+    route_text_color text
 );
 .print 'Createing: stop_times'
 create table stop_times (
-    trip_id integer,
-    arrival_time text,
+    trip_id        integer,
+    arrival_time   text,
     departure_time text,
-    stop_id integer,
-    stop_sequence integer,
-    pickup_type integer,
-    drop_off_type integer,
-    generation_id integer,
+    stop_id        integer,
+    stop_sequence  integer,
+    pickup_type    integer,
+    drop_off_type  integer,
     primary key (trip_id, stop_sequence)
 );
 .print 'Createing: stops'
 create table stops (
-    stop_id   integer primary key,
-    stop_code integer,
-    stop_name text,
-    stop_desc text,
-    stop_lat  real,
-    stop_lon  real,
-    zone_id   integer,
-    generation_id integer
+    stop_id       integer primary key,
+    stop_code     integer,
+    stop_name     text,
+    stop_desc     text,
+    stop_lat      real,
+    stop_lon      real,
+    zone_id       integer
 );
 .print 'Createing: trips'
 create table trips (
-    route_id integer,
-    service_id integer,
-    trip_id integer primary key,
+    route_id      integer,
+    service_id    integer,
+    trip_id       integer primary key,
     trip_headsign text,
-    shape_id integer,
-    direction_id integer,
-    generation_id integer
+    shape_id      integer,
+    direction_id  integer
 );
 .print 'Createing: translations'
 create table translations (
-    table_name text,
-    field_name text,
-    language text,
-    translation text,
-    record_id integre,
-    generation_id integer,
+    table_name    text,
+    field_name    text,
+    language      text,
+    translation   text,
+    record_id     integre,
     primary key (
         table_name,
         field_name,
