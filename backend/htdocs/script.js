@@ -105,6 +105,10 @@ function hide_loader() {
   loaderEl.style.display = 'none'
 }
 
+function map_pin(lat, lon) {
+  return `<a target="_blank" href="https://maps.google.com/maps?q=loc:${lat},${lon}">📍</a><br>`
+}
+
 // renders
 
 function stop_line(pfx, id, m, t, active) {
@@ -115,10 +119,7 @@ function stop_line(pfx, id, m, t, active) {
     `<button onclick="act_timetable(event, '${lab}_buses', ${id}, '${lab}_walks')">🚍</button> ` +
     (t ? `<tt>🚍 ${t}</tt> ` : '') +
     (m ? `<tt>🚶 ${m}m</tt> &rarr; ` : '') +
-    `<a onclick="act_stop(event, ${id})">` +
-    esc(v.name) +
-    '</a>' +
-    `<a target="_blank" href="https://maps.google.com/maps?q=loc:${v.lat},${v.lon}">📍</a><br>` +
+    `<a onclick="act_stop(event, ${id})">${esc(v.name)}</a> ${map_pin(v.lat, v.lon)}<br>` +
     v.routes.map((x) => `<span class="r${esc(x)}">${esc(x)}</span>`).join('\n') +
     `<ul id="${lab}_walks"></ul><ul id="${lab}_buses"></ul></li>`
 }
@@ -175,7 +176,7 @@ async function stop_page(id) {
   current_stop = id
   const si = stops_info[id]
   document.title = esc(si.name) + (si.alt_name ? ' — ' + esc(si.alt_name) : '') + ' — ' + baseTitle
-  titleEl.innerHTML = esc(si.name) + (si.alt_name ? '<br>' + esc(si.alt_name) : '')
+  titleEl.innerHTML = esc(si.name) + (si.alt_name ? '<br>' + esc(si.alt_name) : '') + map_pin(si.lat, si.lon)
   staticEl.innerHTML = '<h2>' +
     '<a onclick="act_root(event)">◀ Back to all stops</a> ⸽ ' +
     '<a onclick="toggle_hidding(event, \'stop-page-walking\')">Nearby ▾</a>' +
