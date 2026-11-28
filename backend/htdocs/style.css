@@ -750,6 +750,9 @@ button tt {
 }
 
 #error {
+  position: sticky;
+  top: 12px;
+
   margin: 0 0 16px;
   padding: 11px 14px;
 
