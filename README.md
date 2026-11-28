@@ -126,18 +126,9 @@ StateDirectory=nimabus/var
 
 I'm showing my setup and my paths, of cause you are free to tune them as you like.
 
-## Known issues
+## Known issues and ideas
 
-### Beware
-
-- `download.sh` **replaces** existing GTFS data. Additionally, it's currently focused on Limassol only.
-
-### Fundamental limitations
-
-- **HTML over the wire.** This approach makes certain UI features difficult to implement, such as lists of recently viewed stops. Switching to a JSON API with client-side rendering would address this.
-- **Incremental UI updates.** These can lead to inconsistencies when the underlying data changes.
-
-### Grand Redevelopment
+### Grand Redevelopment required
 
 At the moment, the backend data structure almost entirely mirrors the GTFS structure.
 
@@ -150,31 +141,24 @@ There is really only one solution: design and implement data model that can supp
 
 I think this can wait until we have some real-world experience with the site and a clearer understanding of all the requirements.
 
-### Nice to have
-
-- List of recently viewed stops
-- ~List of nearby stops~ `DONE`
-- ~Show routes for each stop~ `DONE`
-- Limit the date range
-- ~Use a shared date list~ `DONE`
-- ~Search~ `DONE`
-- Localization and multilingual support
-- ~~Display errors~~
-- Handle edge cases (e.g. today being outside the available date range)
-- ~~UI has to be more mobile friendly~~
-
 ### Integration with online maps
 
 Services like this are usually closely integrated with maps.
 However, I haven't seen a UI that I find particularly convenient.
 At the same time, schematic diagrams of routes and transfers can be very useful.
 
+Another problem can be seen right on the transport layer in Google Maps:
+
+A single physical bus stop can be represented as multiple separate stops located very close to each other.
+
+This happens because different data sources (for different routes) maintain their own stop lists,
+with their own GPS coordinates and sometimes even different names, despite referring to the same physical bus stop.
+
+This looks really awkward on a map.
+However, on schematic diagrams, these can simply be represented as regular stop-to-stop or route-to-route connections.
+
 I'd prioritize schematic diagrams and take that approach first.
 That's why I'm in no hurry to integrate maps — I don't want to let them cloud my vision of what the UI should look like.
-
-### Updates
-
-- The `updated_at` field is not a reliable indicator. We need a more robust way to track data versions or upload generations.
 
 ## Limitations to keep in mind
 
@@ -182,6 +166,20 @@ Some bus operators seem to maintain denormalized data on their side.
 They generate new foreign keys with every data export, which can make updates difficult.
 This is why I've separated the *upload* and *merge* phases in `download.sh`.
 The *merge* phase may not be implemented carefully enough yet.
+
+### Questions to answer
+
+If we decide to support more operators (not just ΕΜΕΛ), we'll need to reconsider a few UI elements:
+
+- **The home page:** We won't be able to display all stops as we do now, as the list would become too long. What should we show instead?
+- **Search:** By route and operator? Or across all operators, with labels to indicate which operator each result belongs to?
+- **Provider filtering:** Do we need some kind of provider filter? If so, where should it appear — in the nearby stops list, for example?
+
+### Nice to have
+
+- List of recently viewed stops
+- Sort of bookmarks
+- Handle edge cases (e.g. today being outside the available date range)
 
 ### Development
 
