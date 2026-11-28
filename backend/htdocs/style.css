@@ -760,6 +760,8 @@ button tt {
   color: var(--text);
   background: color-mix(in srgb, var(--danger) 13%, var(--surface));
 
+  cursor: pointer;
+
   font-weight: 650;
 }
 

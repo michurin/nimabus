@@ -87,6 +87,10 @@ async function fetchJson(url) {
     if (!r.ok) {
       throw new Error(`Response is not ok: ${r.status}`)
     }
+    const g = +r.headers.get('minabus-data-generation')
+    if (g && g != generation) {
+      show_error() // oh. Hackish: we control UI on transport layer
+    }
     const x = await r.json()
     cache[url] = x
     return x
@@ -221,6 +225,7 @@ window.addEventListener('popstate', (ev) => {
   if (navigator.language.toLowerCase().startsWith('el')) {
     document.getElementById('theme-toggle-label').textContent = 'Αλλαγή θέματος'
     document.getElementById('theme-toggle').setAttribute('aria-label', 'Εναλλαγή μεταξύ φωτεινού και σκοτεινού θέματος')
+    errorEl.textContent = 'Οι πληροφορίες ενδέχεται να έχουν αλλάξει. Παρακαλώ ανανεώστε τη σελίδα και δοκιμάστε ξανά.'
   }
 })()
 
