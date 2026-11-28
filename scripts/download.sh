@@ -45,8 +45,6 @@ else
     sqlite3 "$DB_DIR/$DB_FILE" -cmd ".cd $DATA_DIR" < sql/10_load.sql
     sqlite3 "$DB_DIR/$DB_FILE" < sql/20_merge.sql
     sqlite3 "$DB_DIR/$DB_FILE" < sql/30_derived.sql
-
-    curl -qs http://127.0.0.1:3333?to=153812628 -d "($(whoami):$(pwd)) nimabus updated $(date)" ################################# TODO
 fi
 
 cp "$DATA_DIR/headers_" "$DATA_DIR/headers"
