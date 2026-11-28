@@ -114,7 +114,7 @@ order by stop_times.arrival_time
 		return Wrf("schedule: trip: db: %w", err)
 	}
 	defer rows.Close()
-	r := []dto(nil)
+	r := []dto{} // it must be not nil/null, in any case it have to be an array
 	for rows.Next() {
 		var id, direction int
 		var shortName, aTime string
@@ -322,7 +322,7 @@ func varDates(ctx context.Context, db *sql.DB, w io.Writer) (string, error) {
 	defer rows.Close()
 	current := time.Now().Format(yymd)
 	ok := false
-	data := []dto(nil)
+	data := []dto{}
 	for rows.Next() {
 		var date string
 		rows.Scan(&date)
@@ -390,7 +390,7 @@ func generationHeaders(ctx context.Context, db *sql.DB, w http.ResponseWriter) e
 	if err != nil {
 		return Wrf("generation: %w", err)
 	}
-	w.Header().Add("Minabus-data-generation", strconv.Itoa(c))
+	w.Header().Add("Minabus-Data-Generation", strconv.Itoa(c))
 	return nil
 }
 
