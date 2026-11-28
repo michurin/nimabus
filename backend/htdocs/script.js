@@ -115,14 +115,20 @@ function map_pin(lat, lon) {
 
 // renders
 
-function stop_line(pfx, id, m, t, active) {
+function stop_line(pfx, id, dist, dist_time, tm, active) {
   const v = stops_info[id]
   const lab = `${pfx}_stop_${id}`
   return `<li${active ? ' class="current_stop"' : ''}>` +
-    (m ? '' : `<button onclick="act_walk(event, '${lab}_walks', ${id}, '${lab}_buses')">🚶</button> `) +
-    `<button onclick="act_timetable(event, '${lab}_buses', ${id}, '${lab}_walks')">🚍</button> ` +
-    (t ? `<tt>🚍 ${t}</tt> ` : '') +
-    (m ? `<tt>🚶 ${m}m</tt> &rarr; ` : '') +
+    (dist ? '' : `<button class="pop walk" onclick="act_walk(event, '${lab}_walks', ${id}, '${lab}_buses'${tm ? `, '${tm}'` : ''})">🚶</button> `) +
+    `<button class="pop time" onclick="act_timetable(event, '${lab}_buses', ${id}, '${lab}_walks')">🚍</button> ` +
+    (tm ? `<tt>🚍 ${tm}</tt> ` : '') +
+    (dist || dist_time ? (
+      '<tt>🚶 ' +
+      (dist ? `${dist}` : '') +
+      (dist_time ? ` (~${dist_time})` : '') +
+      '</tt> '
+    ) : '') +
+    (tm || dist || dist_time ? ' ' : '') +
     `<a onclick="act_stop(event, ${id})">${esc(v.name)}</a> ${map_pin(v.lat, v.lon)}<br>` +
     v.routes.map((x) => `<span class="r${esc(x)}">${esc(x)}</span>`).join('\n') +
     `<ul id="${lab}_walks"></ul><ul id="${lab}_buses"></ul></li>`
@@ -186,7 +192,7 @@ async function stop_page(id) {
     '<a onclick="toggle_hidding(event, \'stop-page-walking\')">Nearby ▾</a>' +
     '</h2>' +
     '<ul id="stop-page-walking" style="display:none">' +
-    si.distances.map((x) => stop_line('walk', x.id, x.m)).join('\n') + '</ul>'
+    si.distances.map((x) => stop_line('walk', x.id, `${x.m}m`)).join('\n') + '</ul>'
   await stop_page_dynamic(id)
   window.scrollTo(0, 0)
 }
@@ -279,7 +285,7 @@ async function act_trip(ev, pfx, id, stop_id) {
     show_loader()
     const sh = await fetchJson(`/api/trip/${id}.json`)
     if (sh) {
-      e.innerHTML = sh.map((x) => stop_line(pfx, x.id, false, x.t, x.id === stop_id)).join('\n')
+      e.innerHTML = sh.map((x) => stop_line(pfx, x.id, false, false, x.t, x.id === stop_id)).join('\n')
     } else {
       show_error()
     }
@@ -289,17 +295,35 @@ async function act_trip(ev, pfx, id, stop_id) {
   }
 }
 
-function act_walk(ev, pfx, id, clean) {
+function act_walk(ev, pfx, id, clean, base_time) {
   ev.stopPropagation()
   ev.preventDefault()
+  const bt = time_a2i(base_time)
   document.getElementById(`${clean}`).innerHTML = ''
   const e = document.getElementById(`${pfx}`)
   const l = `${pfx}`
   if (e.childElementCount === 0) {
-    e.innerHTML = (stops_info[id]?.distances || []).map((x) => stop_line(l, x.id, x.m)).join('\n')
+    e.innerHTML = (stops_info[id]?.distances || []).map((x) => stop_line(l, x.id, `${x.m}m`, bt < 0 ? false : time_i2a(bt + 5 + x.m / 40))).join('\n')
   } else {
     e.innerHTML = ''
   }
+}
+
+function time_a2i(x) {
+  if (!x) {
+    return -1
+  }
+  const a = x.split(':')
+  if (a.length !== 2) {
+    return -1
+  }
+  return (+a[0]) * 60 + (+a[1])
+}
+
+function time_i2a(x) {
+  const h = (~~(x / 60)) % 24
+  const m = ~~(x % 60)
+  return `${h < 10 ? `0${h}` : h}:${m < 10 ? `0${m}` : m}`
 }
 
 function act_search(ev) { // it works on root page only
