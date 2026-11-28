@@ -612,6 +612,73 @@ button:disabled {
   cursor: not-allowed;
 }
 
+/* Bubbles */
+
+button.pop {
+  position: relative;
+  overflow: visible;
+}
+
+button.pop::after {
+  position: absolute;
+  z-index: 1000;
+
+  left: 100%;
+  bottom: calc(100% + 8px);
+
+  transform: translateX(-50%) translateY(4px);
+
+  padding: 7px 11px;
+
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+
+  color: var(--text);
+  background: var(--surface-raised);
+
+  font: 12px/1.4 var(--font-ui);
+  font-weight: 500;
+  white-space: pre;
+
+  box-shadow: var(--shadow);
+
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
+
+  animation: hide-bubble 0s 60s forwards;
+}
+
+@keyframes hide-bubble {
+  to {
+    visibility: hidden;
+  }
+}
+
+button.pop:hover::after,
+button.pop:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+@media (hover: none) and (pointer: coarse) {
+  button.pop:active::after {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+button.pop.walk:after {
+  content: "Within\A walking\A distance";
+}
+
+button.pop.time:after {
+  content: "Bus\A timetable";
+}
 
 /* ==========================================================================
    9. Route badges
