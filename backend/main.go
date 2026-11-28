@@ -57,7 +57,7 @@ func handlerVars(ctx context.Context, db *sql.DB, w io.Writer) error {
 	if err != nil {
 		return Wrf("stop info: %w", err)
 	}
-	fmt.Fprint(w, "export var current_date = '"+current+"'\n")
+	fmt.Fprint(w, "export const current_date = '"+current+"'\n")
 	fmt.Fprint(w, "export const stops_info = ")
 	err = varStops(ctx, db, w)
 	if err != nil {

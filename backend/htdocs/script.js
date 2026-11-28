@@ -8,7 +8,7 @@
 /*eslint prefer-arrow-callback: "error"*/
 /*eslint arrow-body-style: "error"*/
 
-import { generation, dates, current_date, stops_info } from './vars.js'
+import { generation, dates, current_date as current_date_, stops_info } from './vars.js'
 import { StringNgramIndex } from './ngramindex.js'
 
 // constants
@@ -60,6 +60,7 @@ const cache = {}
 
 // state
 
+let current_date = current_date_ // global app scope
 let scope = 'root'
 let current_stop = 0 // on scope != root
 let filtered = undefined // on scope == root
